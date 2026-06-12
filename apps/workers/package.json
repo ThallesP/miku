@@ -1,0 +1,20 @@
+{
+	"name": "workers",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "bun --watch src/index.ts",
+		"start": "bun src/index.ts",
+		"check": "tsc --noEmit",
+		"lint": "biome lint --config-path ../../biome.json .",
+		"format": "biome format --config-path ../../biome.json ."
+	},
+	"dependencies": {
+		"@miku/sdk": "workspace:*",
+		"@restatedev/restate-sdk": "^1.7.0"
+	},
+	"devDependencies": {
+		"@types/node": "^22.10.2",
+		"typescript": "^6.0.2"
+	}
+}

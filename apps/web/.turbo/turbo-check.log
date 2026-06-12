@@ -1,2 +1,0 @@
-$ biome check --config-path ../../biome.json .
-Checked 9 files in 5ms. No fixes applied.

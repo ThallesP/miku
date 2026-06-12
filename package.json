@@ -1,17 +1,17 @@
 {
-	"name": "simple-turbo-tanstack-convex",
+	"name": "miku",
 	"private": true,
 	"type": "module",
 	"workspaces": [
-		"apps/*"
+		"apps/*",
+		"packages/*"
 	],
 	"scripts": {
 		"dev": "turbo dev",
 		"build": "turbo build",
 		"check": "biome check . && turbo check",
 		"lint": "turbo lint",
-		"format": "biome format --write .",
-		"convex:dev": "bun --cwd apps/web convex dev"
+		"format": "biome format --write ."
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.5",

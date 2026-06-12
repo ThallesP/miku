@@ -1,0 +1,26 @@
+{
+	"name": "@miku/db",
+	"private": true,
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		}
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.build.json",
+		"check": "tsc --noEmit",
+		"lint": "biome lint --config-path ../../biome.json .",
+		"format": "biome format --config-path ../../biome.json ."
+	},
+	"dependencies": {
+		"@mikro-orm/core": "^6.6.5",
+		"@mikro-orm/libsql": "^6.6.5"
+	},
+	"devDependencies": {
+		"@types/node": "^25.9.3",
+		"typescript": "^6.0.2"
+	}
+}

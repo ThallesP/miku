@@ -2,307 +2,188 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
 	Background,
 	BackgroundVariant,
-	Controls,
-	Handle,
 	type Node,
 	type NodeProps,
 	type NodeTypes,
-	Position,
 	ReactFlow,
+	useNodesState,
 } from "@xyflow/react";
-import { useMutation, useQuery } from "convex/react";
-import { makeFunctionReference } from "convex/server";
 import { Plus } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Button } from "@/components/ui/button";
-import { useAppConvexStatus } from "@/convex-provider";
+import {
+	API_URL,
+	type ApplicationHTTP,
+	apiClient,
+	type ServerHTTP,
+} from "@/lib/api-client";
 
-export const Route = createFileRoute("/")({ component: Home });
+export const Route = createFileRoute("/")({ component: Dashboard, ssr: false });
 
-type ApplicationStatus = "queued" | "ready";
+type ApplicationNodeData = ApplicationHTTP & Record<string, unknown>;
+type ServerNodeData = ServerHTTP & Record<string, unknown>;
 
-type Application = {
-	createdAt: number;
-	id: string;
-	name: string;
-	status: ApplicationStatus;
-	x: number;
-	y: number;
-};
-
-type ConvexApplication = Omit<Application, "id"> & {
-	_id: string;
-};
-
-type ApplicationInput = {
-	name: string;
-	x: number;
-	y: number;
-};
-
-type ApplicationNodeData = {
-	createdLabel: string;
-	name: string;
-	status: ApplicationStatus;
-	syncLabel: string;
-} & Record<string, unknown>;
-
-type ApplicationFlowNode = Node<ApplicationNodeData, "application">;
-
-const listApplications = makeFunctionReference<
-	"query",
-	Record<string, never>,
-	ConvexApplication[]
->("applications:list");
-
-const createApplication = makeFunctionReference<
-	"mutation",
-	ApplicationInput,
-	string
->("applications:create");
+type CanvasNode =
+	| Node<ApplicationNodeData, "application">
+	| Node<ServerNodeData, "server">;
 
 const nodeTypes = {
-	application: ApplicationCardNode,
+	application: ApplicationNode,
+	server: ServerNode,
 } satisfies NodeTypes;
 
-function Home() {
-	const { enabled } = useAppConvexStatus();
-
-	if (enabled) {
-		return <SyncedCanvas />;
-	}
-
-	return <LocalCanvas />;
+function buildNodes(
+	applications: ApplicationHTTP[],
+	servers: ServerHTTP[],
+): CanvasNode[] {
+	return [
+		...servers.map(
+			(server, index) =>
+				({
+					id: `server-${server.id}`,
+					type: "server",
+					position: { x: -260, y: 40 + index * 120 },
+					draggable: false,
+					data: server,
+				}) satisfies CanvasNode,
+		),
+		...applications.map(
+			(application) =>
+				({
+					id: `application-${application.id}`,
+					type: "application",
+					position: { x: application.x, y: application.y },
+					data: application,
+				}) satisfies CanvasNode,
+		),
+	];
 }
 
-function SyncedCanvas() {
-	const applicationsQuery = useSyncedApplications();
-	const [isCreating, setIsCreating] = useState(false);
-	const apps = (applicationsQuery.data ?? []).map((app) => ({
-		createdAt: app.createdAt,
-		id: app._id,
-		name: app.name,
-		status: app.status,
-		x: app.x,
-		y: app.y,
-	}));
+function Dashboard() {
+	const [applications, setApplications] = useState<ApplicationHTTP[]>([]);
+	const [servers, setServers] = useState<ServerHTTP[]>([]);
+	const [nodes, setNodes, onNodesChange] = useNodesState<CanvasNode>([]);
+	const draggingRef = useRef(false);
+
+	const refresh = useCallback(async () => {
+		const [nextApplications, nextServers] = await Promise.all([
+			apiClient.applications.fetch(),
+			apiClient.servers.fetch(),
+		]);
+
+		setApplications(nextApplications);
+		setServers(nextServers);
+	}, []);
+
+	useEffect(() => {
+		refresh();
+
+		const events = new EventSource(`${API_URL}/events`);
+		events.onmessage = () => {
+			refresh();
+		};
+
+		return () => {
+			events.close();
+		};
+	}, [refresh]);
+
+	useEffect(() => {
+		if (draggingRef.current) {
+			return;
+		}
+
+		setNodes(buildNodes(applications, servers));
+	}, [applications, servers, setNodes]);
 
 	async function handleAddApplication() {
-		const nextIndex = apps.length;
-		const position = getApplicationPosition(nextIndex);
+		const index = applications.length;
 
-		setIsCreating(true);
-		try {
-			await applicationsQuery.create({
-				name: `Application ${nextIndex + 1}`,
-				x: position.x,
-				y: position.y,
-			});
-		} finally {
-			setIsCreating(false);
-		}
-	}
-
-	return (
-		<CanvasShell
-			applications={apps}
-			isAdding={isCreating}
-			isLoading={applicationsQuery.data === undefined}
-			onAddApplication={handleAddApplication}
-			syncLabel="Convex live sync"
-		/>
-	);
-}
-
-function LocalCanvas() {
-	const [applications, setApplications] = useState<Application[]>([]);
-
-	function handleAddApplication() {
-		setApplications((currentApplications) => {
-			const nextIndex = currentApplications.length;
-			const position = getApplicationPosition(nextIndex);
-
-			return [
-				...currentApplications,
-				{
-					createdAt: Date.now(),
-					id: `local-${Date.now()}-${nextIndex}`,
-					name: `Application ${nextIndex + 1}`,
-					status: "ready",
-					x: position.x,
-					y: position.y,
-				},
-			];
+		await apiClient.applications.create({
+			name: `Application ${index + 1}`,
+			x: 120 + (index % 3) * 300,
+			y: 80 + Math.floor(index / 3) * 180,
 		});
 	}
 
 	return (
-		<CanvasShell
-			applications={applications}
-			isAdding={false}
-			isLoading={false}
-			onAddApplication={handleAddApplication}
-			syncLabel="Local draft mode"
-		/>
-	);
-}
+		<main className="h-screen w-screen bg-slate-50 text-slate-950">
+			<ReactFlow
+				className="miku-canvas"
+				fitView
+				fitViewOptions={{ maxZoom: 1, padding: 0.3 }}
+				nodeTypes={nodeTypes}
+				nodes={nodes}
+				onNodesChange={onNodesChange}
+				onNodeDragStart={() => {
+					draggingRef.current = true;
+				}}
+				onNodeDragStop={async (_event, node) => {
+					draggingRef.current = false;
 
-function useSyncedApplications() {
-	return {
-		create: useMutation(createApplication),
-		data: useQuery(listApplications, {}),
-	};
-}
+					if (node.type === "application") {
+						await apiClient.applications.move(
+							(node.data as ApplicationHTTP).id,
+							{ x: node.position.x, y: node.position.y },
+						);
+					}
+				}}
+				nodesConnectable={false}
+				panOnScroll
+				proOptions={{ hideAttribution: true }}
+			>
+				<Background
+					color="#cbd5e1"
+					gap={24}
+					size={1}
+					variant={BackgroundVariant.Dots}
+				/>
+			</ReactFlow>
 
-function CanvasShell({
-	applications,
-	isAdding,
-	isLoading,
-	onAddApplication,
-	syncLabel,
-}: {
-	applications: Application[];
-	isAdding: boolean;
-	isLoading: boolean;
-	onAddApplication: () => void;
-	syncLabel: string;
-}) {
-	const nodes = applications.map((application) => ({
-		data: {
-			createdLabel: new Intl.DateTimeFormat("en", {
-				hour: "numeric",
-				minute: "2-digit",
-			}).format(application.createdAt),
-			name: application.name,
-			status: application.status,
-			syncLabel,
-		},
-		dragging: false,
-		id: application.id,
-		position: { x: application.x, y: application.y },
-		type: "application",
-	})) satisfies ApplicationFlowNode[];
-
-	return (
-		<main className="min-h-screen overflow-hidden bg-slate-50 text-slate-950">
-			<header className="flex min-h-18 flex-col gap-4 border-slate-200 border-b bg-white px-5 py-4 md:flex-row md:items-center md:justify-between md:px-6">
-				<div>
-					<p className="font-medium text-slate-500 text-xs uppercase tracking-wide">
-						Runway
-					</p>
-					<h1 className="font-semibold text-2xl tracking-tight">
-						Application canvas
-					</h1>
-				</div>
-
-				<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-					<div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-slate-600 text-sm">
-						{syncLabel}
-					</div>
-					<Button
-						className="h-10 rounded-md bg-slate-900 px-4 font-medium text-white hover:bg-slate-700"
-						disabled={isAdding}
-						onClick={onAddApplication}
-					>
-						<Plus className="size-4" />
-						{isAdding ? "Adding..." : "Add application"}
-					</Button>
-				</div>
-			</header>
-
-			<section className="relative h-[calc(100vh-4.5rem)] min-h-[520px]">
-				{applications.length === 0 && !isLoading ? (
-					<div className="absolute inset-0 z-10 grid place-items-center px-6">
-						<div className="max-w-sm rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm">
-							<h2 className="font-semibold text-xl tracking-tight">
-								Empty canvas
-							</h2>
-							<p className="mt-2 text-slate-600 text-sm leading-6">
-								Add an application to place it on the canvas.
-							</p>
-							<Button
-								className="mt-5 rounded-md bg-slate-900 px-4 font-medium text-white hover:bg-slate-700"
-								onClick={onAddApplication}
-							>
-								<Plus className="size-4" />
-								Add application
-							</Button>
-						</div>
-					</div>
-				) : null}
-
-				{isLoading ? (
-					<div className="absolute inset-x-0 top-8 z-10 mx-auto w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-600 text-sm shadow-sm">
-						Loading canvas
-					</div>
-				) : null}
-
-				<ReactFlow
-					className="runway-canvas"
-					fitView
-					fitViewOptions={{ maxZoom: 1, padding: 0.35 }}
-					nodeTypes={nodeTypes}
-					nodes={nodes}
-					nodesDraggable={false}
-					nodesFocusable={false}
-					nodesConnectable={false}
-					onNodesChange={() => undefined}
-					panOnScroll
-					proOptions={{ hideAttribution: true }}
-				>
-					<Background
-						color="#cbd5e1"
-						gap={24}
-						size={1}
-						variant={BackgroundVariant.Dots}
-					/>
-					<Controls position="bottom-right" showInteractive={false} />
-				</ReactFlow>
-			</section>
+			<button
+				className="absolute top-4 left-4 z-10 flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 font-medium text-sm text-white shadow-sm hover:bg-slate-700"
+				onClick={handleAddApplication}
+				type="button"
+			>
+				<Plus className="size-4" />
+				Add application
+			</button>
 		</main>
 	);
 }
 
-function ApplicationCardNode({ data }: NodeProps<ApplicationFlowNode>) {
+function ApplicationNode({
+	data,
+}: NodeProps<Node<ApplicationNodeData, "application">>) {
 	return (
-		<div className="w-60 rounded-lg border border-slate-200 bg-white p-4 text-slate-950 shadow-sm">
-			<Handle
-				className="!border-white !bg-slate-400"
-				position={Position.Left}
-				type="target"
-			/>
-			<div className="flex items-start justify-between gap-4">
-				<div>
-					<p className="font-semibold text-base">{data.name}</p>
-					<p className="mt-1 text-slate-500 text-sm">Application service</p>
-				</div>
-				<span className="rounded-md bg-slate-100 px-2 py-1 text-slate-600 text-xs">
-					{data.status}
-				</span>
-			</div>
-			<div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-				<div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-					<p className="text-slate-500">Sync</p>
-					<p className="mt-1 text-slate-700">{data.syncLabel}</p>
-				</div>
-				<div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-					<p className="text-slate-500">Added</p>
-					<p className="mt-1 text-slate-700">{data.createdLabel}</p>
-				</div>
-			</div>
-			<Handle
-				className="!border-white !bg-slate-400"
-				position={Position.Right}
-				type="source"
-			/>
+		<div className="w-52 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+			<p className="font-semibold text-sm">{data.name}</p>
+			<p className="mt-1 text-slate-500 text-xs">
+				x {Math.round(data.x)} · y {Math.round(data.y)}
+			</p>
 		</div>
 	);
 }
 
-function getApplicationPosition(index: number) {
-	return {
-		x: 120 + (index % 3) * 310,
-		y: 160 + Math.floor(index / 3) * 210,
-	};
+function ServerNode({ data }: NodeProps<Node<ServerNodeData, "server">>) {
+	return (
+		<div className="w-56 rounded-lg border border-slate-300 border-dashed bg-white p-3 shadow-sm">
+			<div className="flex items-center gap-2">
+				<span
+					className={`size-2 rounded-full ${
+						data.online ? "bg-emerald-500" : "bg-slate-300"
+					}`}
+				/>
+				<p className="font-semibold text-sm">{data.name}</p>
+			</div>
+			<p className="mt-1 text-slate-500 text-xs">
+				{data.address} · {data.network}
+			</p>
+			<p className="mt-0.5 text-slate-400 text-xs">
+				{data.online
+					? "online"
+					: `last seen ${new Date(data.lastSeenAt).toLocaleTimeString()}`}
+			</p>
+		</div>
+	);
 }

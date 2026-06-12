@@ -6,7 +6,7 @@
 		"#/*": "./src/*"
 	},
 	"scripts": {
-		"dev": "convex dev --start \"vite dev --port 3000\"",
+		"dev": "vite dev --port 3000",
 		"generate-routes": "tsr generate",
 		"build": "vite build",
 		"preview": "vite preview",
@@ -16,6 +16,7 @@
 		"check": "biome check --config-path ../../biome.json ."
 	},
 	"dependencies": {
+		"@miku/sdk": "workspace:*",
 		"@tailwindcss/vite": "^4.1.18",
 		"@tanstack/react-devtools": "latest",
 		"@tanstack/react-router": "latest",
@@ -26,7 +27,6 @@
 		"@xyflow/react": "^12.11.0",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
-		"convex": "latest",
 		"lucide-react": "^0.545.0",
 		"nitro": "^3.0.260603-beta",
 		"radix-ui": "^1.5.0",
