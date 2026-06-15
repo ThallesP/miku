@@ -2,19 +2,19 @@ import { Module } from "@nestjs/common";
 import { AuthModule as BetterAuthModule } from "@thallesp/nestjs-better-auth";
 import { getMigrations } from "better-auth/db/migration";
 
-import { EnvModule } from "../env/env.module";
-import { EnvService } from "../env/env.service";
+import { env } from "../env/env";
 import { createAuth } from "./auth";
 
 @Module({
 	imports: [
 		BetterAuthModule.forRootAsync({
-			imports: [EnvModule],
-			useFactory: async (env: EnvService) => {
+			// async only because we run better-auth's migrations on boot; env is
+			// the validated t3-env object, no DI needed
+			useFactory: async () => {
 				const auth = createAuth({
-					databaseUrl: env.get("DATABASE_URL"),
-					secret: env.get("BETTER_AUTH_SECRET"),
-					trustedOrigins: [env.get("WEB_URL")],
+					databaseUrl: env.DATABASE_URL,
+					secret: env.BETTER_AUTH_SECRET,
+					trustedOrigins: [env.WEB_URL],
 				});
 
 				// dev-mode schema sync instead of migrations, per "keep it simple"
@@ -23,7 +23,6 @@ import { createAuth } from "./auth";
 
 				return { auth };
 			},
-			inject: [EnvService],
 		}),
 	],
 })

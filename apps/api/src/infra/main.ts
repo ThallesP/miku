@@ -1,7 +1,7 @@
 import { NestFactory } from "@nestjs/core";
 
 import { AppModule } from "./app.module";
-import { EnvService } from "./env/env.service";
+import { env } from "./env/env";
 
 async function bootstrap() {
 	const app = await NestFactory.create(AppModule, {
@@ -10,17 +10,14 @@ async function bootstrap() {
 		bodyParser: false,
 	});
 
-	const envService = app.get(EnvService);
-
 	// the dashboard is served from another origin (the web app);
 	// credentials are required for better-auth's session cookies
 	app.enableCors({
-		origin: envService.get("WEB_URL"),
+		origin: env.WEB_URL,
 		credentials: true,
 	});
-	const port = envService.get("PORT");
 
-	await app.listen(port);
+	await app.listen(env.PORT);
 }
 
 void bootstrap();
