@@ -46,10 +46,11 @@ export class ApproveWorkerUseCase {
 
 		const server = result.value;
 
-		// mint the worker's identity, persist the Server, then hand the token to
-		// the worker over the tailnet so it can start heartbeating
-		const { userId, token } = await this.workerCredentials.issue(hostname);
-		server.linkUser(userId);
+		// mint the worker's org-scoped api key, persist the Server, then hand the
+		// key to the worker over the tailnet so it can start heartbeating
+		const { organizationId, apiKeyId, token } =
+			await this.workerCredentials.issue(hostname);
+		server.linkCredentials(organizationId, apiKeyId);
 
 		await this.serversRepository.create(server);
 		await this.workerProvisioner.provision(address, token);

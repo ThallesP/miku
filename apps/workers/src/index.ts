@@ -39,7 +39,7 @@ function beginHeartbeat(token: string) {
 // `tailscale status` discovery can find us
 await joinNetwork(workerName, { advertiseTags: ["tag:miku-worker"] });
 
-// the control plane POSTs our bearer token here once an operator approves us;
+// the control plane POSTs our api key here once an operator approves us;
 // single-use — ignored once we already hold a token
 const provisionServer = createServer((request, response) => {
 	if (request.method !== "POST" || request.url !== "/provision") {

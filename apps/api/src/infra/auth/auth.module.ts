@@ -2,7 +2,7 @@ import { Module } from "@nestjs/common";
 import { AuthModule as BetterAuthModule } from "@thallesp/nestjs-better-auth";
 import { getMigrations } from "better-auth/db/migration";
 
-import { auth } from "./auth.instance";
+import { auth } from "./auth";
 
 @Module({
 	imports: [

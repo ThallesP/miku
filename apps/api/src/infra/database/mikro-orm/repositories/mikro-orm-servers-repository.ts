@@ -16,8 +16,8 @@ export class MikroOrmServersRepository implements ServersRepository {
 		return this.em.findOne(Server, { name });
 	}
 
-	findByUserId(userId: string): Promise<Server | null> {
-		return this.em.findOne(Server, { userId });
+	findByApiKeyId(apiKeyId: string): Promise<Server | null> {
+		return this.em.findOne(Server, { apiKeyId });
 	}
 
 	findMany(): Promise<Server[]> {
