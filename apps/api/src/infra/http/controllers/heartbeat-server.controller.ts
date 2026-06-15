@@ -1,6 +1,5 @@
 import { TypedParam, TypedRoute } from "@nestia/core";
 import { Controller, NotFoundException } from "@nestjs/common";
-import { AllowAnonymous } from "@thallesp/nestjs-better-auth";
 import type { tags } from "typia";
 import { HeartbeatServerUseCase } from "../../../domain/canvas/application/use-cases/heartbeat-server";
 import {
@@ -8,8 +7,6 @@ import {
 	ServerPresenter,
 } from "../presenters/server-presenter";
 
-// TODO: tighten auth — public for now to keep workers/web working
-@AllowAnonymous()
 @Controller("servers")
 export class HeartbeatServerController {
 	constructor(private heartbeatServer: HeartbeatServerUseCase) {}
