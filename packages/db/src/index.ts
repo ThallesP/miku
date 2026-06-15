@@ -1,4 +1,7 @@
-import { defineConfig, MikroORM, type Options } from "@mikro-orm/libsql";
+import { join } from "node:path";
+
+import { Migrator } from "@mikro-orm/migrations";
+import { defineConfig, MikroORM, type Options } from "@mikro-orm/postgresql";
 
 import { Application } from "./entities/application";
 import { Position } from "./entities/position";
@@ -18,8 +21,18 @@ export {
 
 export function dbConfig(options: Options = {}) {
 	return defineConfig({
-		dbName: "miku.db",
+		// callers pass clientUrl (a postgres:// connection string); this default
+		// only applies to standalone scripts that don't supply one
+		clientUrl: "postgres://postgres:postgres@localhost:5432/miku",
 		entities: [Application, Position, Server],
+		extensions: [Migrator],
+		migrations: {
+			// __dirname is dist/ at runtime and src/ under ts-node, so the
+			// migrations live in src/migrations and ship compiled in dist/migrations
+			path: join(__dirname, "migrations"),
+			emit: "ts",
+			snapshot: true,
+		},
 		...options,
 	});
 }
@@ -35,8 +48,8 @@ export async function initOrm(options: Options = {}) {
 		}),
 	);
 
-	// dev-mode schema sync instead of migrations, per "keep it simple"
-	await orm.schema.updateSchema();
+	// apply pending migrations (the migration files live in this package)
+	await orm.getMigrator().up();
 
 	return orm;
 }

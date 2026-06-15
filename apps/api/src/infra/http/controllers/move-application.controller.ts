@@ -1,7 +1,6 @@
 import { TypedBody, TypedParam, TypedRoute } from "@nestia/core";
 import { Controller, NotFoundException } from "@nestjs/common";
 import type { tags } from "typia";
-
 import { MoveApplicationUseCase } from "../../../domain/canvas/application/use-cases/move-application";
 import {
 	type ApplicationHTTP,

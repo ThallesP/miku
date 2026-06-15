@@ -1,6 +1,5 @@
 import { TypedRoute } from "@nestia/core";
 import { BadRequestException, Controller } from "@nestjs/common";
-
 import { FetchServersUseCase } from "../../../domain/canvas/application/use-cases/fetch-servers";
 import {
 	type ServerHTTP,

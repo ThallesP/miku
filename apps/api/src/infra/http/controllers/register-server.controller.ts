@@ -1,7 +1,6 @@
 import { TypedBody, TypedRoute } from "@nestia/core";
 import { BadRequestException, Controller } from "@nestjs/common";
 import type { tags } from "typia";
-
 import { RegisterServerUseCase } from "../../../domain/canvas/application/use-cases/register-server";
 import {
 	type ServerHTTP,

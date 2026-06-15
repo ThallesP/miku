@@ -1,7 +1,6 @@
 import { TypedParam, TypedRoute } from "@nestia/core";
 import { Controller, NotFoundException } from "@nestjs/common";
 import type { tags } from "typia";
-
 import { HeartbeatServerUseCase } from "../../../domain/canvas/application/use-cases/heartbeat-server";
 import {
 	type ServerHTTP,

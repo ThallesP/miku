@@ -1,0 +1,23 @@
+# Local Postgres for development. Matches the default DATABASE_URL
+# (postgres://postgres:postgres@localhost:5432/miku) used by the API.
+# Start with: docker compose up -d
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: miku
+    ports:
+      - "5432:5432"
+    volumes:
+      - miku-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d miku"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  miku-pg-data:

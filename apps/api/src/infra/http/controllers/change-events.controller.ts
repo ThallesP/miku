@@ -1,6 +1,5 @@
 import { Controller, type MessageEvent, Sse } from "@nestjs/common";
 import { map, type Observable } from "rxjs";
-
 import { ChangeStream } from "../../events/change-stream";
 
 @Controller("events")

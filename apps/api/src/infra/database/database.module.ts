@@ -5,8 +5,7 @@ import { Module, type OnModuleInit } from "@nestjs/common";
 
 import { ApplicationsRepository } from "../../domain/canvas/application/repositories/applications-repository";
 import { ServersRepository } from "../../domain/canvas/application/repositories/servers-repository";
-import { EnvModule } from "../env/env.module";
-import { EnvService } from "../env/env.service";
+import { env } from "../env/env";
 import { MikroOrmApplicationsRepository } from "./mikro-orm/repositories/mikro-orm-applications-repository";
 import { MikroOrmServersRepository } from "./mikro-orm/repositories/mikro-orm-servers-repository";
 
@@ -14,12 +13,7 @@ import { MikroOrmServersRepository } from "./mikro-orm/repositories/mikro-orm-se
 	imports: [
 		// registers the RequestContext middleware, so every HTTP request gets
 		// its own identity map / unit of work
-		MikroOrmModule.forRootAsync({
-			imports: [EnvModule],
-			useFactory: (env: EnvService) =>
-				dbConfig({ dbName: env.get("MIKU_DB_PATH") }),
-			inject: [EnvService],
-		}),
+		MikroOrmModule.forRoot(dbConfig({ clientUrl: env.DATABASE_URL })),
 	],
 	providers: [
 		{
@@ -37,7 +31,8 @@ export class DatabaseModule implements OnModuleInit {
 	constructor(private orm: MikroORM) {}
 
 	async onModuleInit() {
-		// dev-mode schema sync instead of migrations, per "keep it simple"
-		await this.orm.schema.updateSchema();
+		// apply pending MikroORM migrations on boot; these only manage the
+		// entity tables, so better-auth's tables in the same database are untouched
+		await this.orm.getMigrator().up();
 	}
 }
