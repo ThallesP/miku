@@ -10,7 +10,7 @@
 		"format": "biome format --config-path ../../biome.json ."
 	},
 	"dependencies": {
-		"@miku/sdk": "workspace:*",
+		"@miku/network": "workspace:*",
 		"@restatedev/restate-sdk": "^1.7.0"
 	},
 	"devDependencies": {

@@ -16,6 +16,7 @@
         "@mikro-orm/nestjs": "^6",
         "@mikro-orm/postgresql": "^6.6.5",
         "@miku/db": "workspace:*",
+        "@miku/network": "workspace:*",
         "@nestia/core": "^11.2.1",
         "@nestia/e2e": "^11.2.1",
         "@nestia/fetcher": "^11.2.1",
@@ -91,7 +92,7 @@
     "apps/workers": {
       "name": "workers",
       "dependencies": {
-        "@miku/sdk": "workspace:*",
+        "@miku/network": "workspace:*",
         "@restatedev/restate-sdk": "^1.7.0",
       },
       "devDependencies": {
@@ -108,6 +109,13 @@
       },
       "devDependencies": {
         "@mikro-orm/cli": "^6.6.5",
+        "@types/node": "^25.9.3",
+        "typescript": "^6.0.2",
+      },
+    },
+    "packages/network": {
+      "name": "@miku/network",
+      "devDependencies": {
         "@types/node": "^25.9.3",
         "typescript": "^6.0.2",
       },
@@ -389,6 +397,8 @@
     "@mikro-orm/postgresql": ["@mikro-orm/postgresql@6.6.14", "", { "dependencies": { "@mikro-orm/knex": "6.6.14", "pg": "8.20.0", "postgres-array": "3.0.4", "postgres-date": "2.1.0", "postgres-interval": "4.0.2" }, "peerDependencies": { "@mikro-orm/core": "^6.0.0" } }, "sha512-hgyxpuTaXK0nYhhkmPkz8lx1nzhsqtOQuqQ+oabtyEKuqzPeANRJaV2TczIFYMIczyxKWOylV7g//13qrwqmNQ=="],
 
     "@miku/db": ["@miku/db@workspace:packages/db"],
+
+    "@miku/network": ["@miku/network@workspace:packages/network"],
 
     "@miku/sdk": ["@miku/sdk@workspace:packages/sdk"],
 

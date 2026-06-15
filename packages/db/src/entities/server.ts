@@ -27,6 +27,11 @@ export class Server {
 	@Property({ type: "datetime" })
 	lastSeenAt: Date = new Date();
 
+	// the better-auth user that authenticates this worker (its bearer token is
+	// that user's session); null until the worker is approved/provisioned
+	@Property({ type: "string", nullable: true })
+	userId?: string;
+
 	// hydration from the database bypasses the constructor (and the field
 	// initializers above) — this only runs for newly registered servers
 	private constructor(props: {
@@ -42,6 +47,11 @@ export class Server {
 	// computed, not persisted
 	get isOnline() {
 		return Date.now() - this.lastSeenAt.getTime() < ONLINE_THRESHOLD_MS;
+	}
+
+	// associates the worker's better-auth user once it has been approved
+	linkUser(userId: string) {
+		this.userId = userId;
 	}
 
 	static create(props: {

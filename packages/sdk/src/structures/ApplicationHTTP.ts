@@ -1,23 +1,23 @@
 export type ApplicationHTTP = {
-	id: string;
-	name: string;
-	x: number;
-	y: number;
-	createdAt: number;
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  createdAt: number;
 };
 export namespace ApplicationHTTP {
-	export type o1 = {
-		id: string;
-		name: string;
-		x: number;
-		y: number;
-		createdAt: number;
-	};
-	export type o2 = {
-		id: string;
-		name: string;
-		x: number;
-		y: number;
-		createdAt: number;
-	};
+  export type o1 = {
+    id: string;
+    name: string;
+    x: number;
+    y: number;
+    createdAt: number;
+  };
+  export type o2 = {
+    id: string;
+    name: string;
+    x: number;
+    y: number;
+    createdAt: number;
+  };
 }

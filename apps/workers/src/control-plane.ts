@@ -1,42 +1,41 @@
-import api, { type IConnection } from "@miku/sdk";
-
-import type { NetworkIdentity } from "./network.ts";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 
 const controlPlaneUrl =
 	process.env.CONTROL_PLANE_URL ?? "http://localhost:3100";
 
-const connection: IConnection = { host: controlPlaneUrl };
+// the bearer token the control plane pushes on approval is persisted so the
+// worker keeps authenticating across restarts without needing re-approval
+const tokenFile =
+	process.env.WORKER_TOKEN_FILE ?? join(homedir(), ".miku", "worker-token");
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-/** Announce this worker to the control plane, retrying until it is up. */
-export async function registerServer(identity: NetworkIdentity) {
-	for (;;) {
-		try {
-			const server = await api.functional.servers.register(
-				connection,
-				identity,
-			);
-
-			console.log(
-				`[control-plane] registered as server ${server.id} (${server.name})`,
-			);
-
-			return server;
-		} catch {
-			console.warn(
-				`[control-plane] not reachable at ${controlPlaneUrl}, retrying...`,
-			);
-		}
-
-		await sleep(2000);
+export async function readStoredToken(): Promise<string | null> {
+	try {
+		const token = (await readFile(tokenFile, "utf8")).trim();
+		return token || null;
+	} catch {
+		return null;
 	}
 }
 
-export function startHeartbeat(serverId: string, intervalMs = 5000) {
+export async function storeToken(token: string): Promise<void> {
+	await mkdir(dirname(tokenFile), { recursive: true });
+	await writeFile(tokenFile, token, { mode: 0o600 });
+}
+
+/** Heartbeat the control plane using the worker's bearer token. */
+export function startHeartbeat(token: string, intervalMs = 5000) {
 	return setInterval(async () => {
 		try {
-			await api.functional.servers.heartbeat(connection, serverId);
+			const response = await fetch(`${controlPlaneUrl}/servers/heartbeat`, {
+				method: "POST",
+				headers: { authorization: `Bearer ${token}` },
+			});
+
+			if (!response.ok) {
+				console.warn(`[control-plane] heartbeat rejected: ${response.status}`);
+			}
 		} catch {
 			// control plane briefly unreachable; next beat will retry
 		}
