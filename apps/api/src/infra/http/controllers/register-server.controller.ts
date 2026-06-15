@@ -1,7 +1,7 @@
 import { TypedBody, TypedRoute } from "@nestia/core";
 import { BadRequestException, Controller } from "@nestjs/common";
+import { AllowAnonymous } from "@thallesp/nestjs-better-auth";
 import type { tags } from "typia";
-
 import { RegisterServerUseCase } from "../../../domain/canvas/application/use-cases/register-server";
 import {
 	type ServerHTTP,
@@ -14,6 +14,8 @@ export interface RegisterServerBody {
 	network: string & tags.MinLength<1>;
 }
 
+// TODO: tighten auth — public for now to keep workers/web working
+@AllowAnonymous()
 @Controller("servers")
 export class RegisterServerController {
 	constructor(private registerServer: RegisterServerUseCase) {}

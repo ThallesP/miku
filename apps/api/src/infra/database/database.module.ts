@@ -17,7 +17,7 @@ import { MikroOrmServersRepository } from "./mikro-orm/repositories/mikro-orm-se
 		MikroOrmModule.forRootAsync({
 			imports: [EnvModule],
 			useFactory: (env: EnvService) =>
-				dbConfig({ dbName: env.get("MIKU_DB_PATH") }),
+				dbConfig({ clientUrl: env.get("DATABASE_URL") }),
 			inject: [EnvService],
 		}),
 	],
@@ -37,7 +37,9 @@ export class DatabaseModule implements OnModuleInit {
 	constructor(private orm: MikroORM) {}
 
 	async onModuleInit() {
-		// dev-mode schema sync instead of migrations, per "keep it simple"
-		await this.orm.schema.updateSchema();
+		// dev-mode schema sync instead of migrations, per "keep it simple";
+		// dropTables: false so better-auth's tables (not MikroORM entities)
+		// in the same database survive the sync
+		await this.orm.schema.updateSchema({ dropTables: false });
 	}
 }

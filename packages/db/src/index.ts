@@ -1,4 +1,4 @@
-import { defineConfig, MikroORM, type Options } from "@mikro-orm/libsql";
+import { defineConfig, MikroORM, type Options } from "@mikro-orm/postgresql";
 
 import { Application } from "./entities/application";
 import { Position } from "./entities/position";
@@ -18,7 +18,9 @@ export {
 
 export function dbConfig(options: Options = {}) {
 	return defineConfig({
-		dbName: "miku.db",
+		// callers pass clientUrl (a postgres:// connection string); this default
+		// only applies to standalone scripts that don't supply one
+		clientUrl: "postgres://postgres:postgres@localhost:5432/miku",
 		entities: [Application, Position, Server],
 		...options,
 	});

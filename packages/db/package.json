@@ -17,7 +17,7 @@
 	},
 	"dependencies": {
 		"@mikro-orm/core": "^6.6.5",
-		"@mikro-orm/libsql": "^6.6.5"
+		"@mikro-orm/postgresql": "^6.6.5"
 	},
 	"devDependencies": {
 		"@types/node": "^25.9.3",

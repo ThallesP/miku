@@ -1,7 +1,7 @@
 import { TypedBody, TypedParam, TypedRoute } from "@nestia/core";
 import { Controller, NotFoundException } from "@nestjs/common";
+import { AllowAnonymous } from "@thallesp/nestjs-better-auth";
 import type { tags } from "typia";
-
 import { MoveApplicationUseCase } from "../../../domain/canvas/application/use-cases/move-application";
 import {
 	type ApplicationHTTP,
@@ -14,6 +14,8 @@ export interface MoveApplicationBody {
 	y?: number;
 }
 
+// TODO: tighten auth — public for now to keep workers/web working
+@AllowAnonymous()
 @Controller("applications")
 export class MoveApplicationController {
 	constructor(private moveApplication: MoveApplicationUseCase) {}
