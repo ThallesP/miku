@@ -31,9 +31,8 @@ export class DatabaseModule implements OnModuleInit {
 	constructor(private orm: MikroORM) {}
 
 	async onModuleInit() {
-		// dev-mode schema sync instead of migrations, per "keep it simple";
-		// dropTables: false so better-auth's tables (not MikroORM entities)
-		// in the same database survive the sync
-		await this.orm.schema.updateSchema({ dropTables: false });
+		// apply pending MikroORM migrations on boot; these only manage the
+		// entity tables, so better-auth's tables in the same database are untouched
+		await this.orm.getMigrator().up();
 	}
 }
