@@ -1,0 +1,22 @@
+{
+	"name": "@miku/network",
+	"private": true,
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		}
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.build.json",
+		"check": "tsc --noEmit",
+		"lint": "biome lint --config-path ../../biome.json .",
+		"format": "biome format --config-path ../../biome.json ."
+	},
+	"devDependencies": {
+		"@types/node": "^25.9.3",
+		"typescript": "^6.0.2"
+	}
+}

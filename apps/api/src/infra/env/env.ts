@@ -13,6 +13,10 @@ export const env = createEnv({
 		// required in production; better-auth falls back to a dev secret
 		BETTER_AUTH_SECRET: z.string().optional(),
 		WEB_URL: z.url().default("http://localhost:3000"),
+		// tailnet tag that identifies a miku worker during discovery
+		WORKER_TAG: z.string().default("tag:miku-worker"),
+		// port a worker exposes for the control plane to push its token to
+		WORKER_CONTROL_PORT: z.coerce.number().int().positive().default(9091),
 	},
 	runtimeEnv: process.env,
 	// treat "" the same as unset so blank vars fall back to defaults/optional
