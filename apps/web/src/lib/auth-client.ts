@@ -15,3 +15,9 @@ export const authClient = createAuthClient({
 	// mirror the server plugins so the session type carries `activeOrganizationId`
 	plugins: [organizationClient()],
 });
+
+// resolved session shape (`{ user, session }`, including organization fields),
+// derived from the client so it tracks the configured plugins
+export type Session = NonNullable<
+	Awaited<ReturnType<typeof authClient.getSession>>["data"]
+>;

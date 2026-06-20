@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import {
 	Background,
 	BackgroundVariant,
@@ -17,8 +17,25 @@ import {
 	type ServerHTTP,
 } from "@/lib/api-client";
 import { API_URL } from "@/lib/env";
+import { getSession } from "@/lib/session";
 
-export const Route = createFileRoute("/_authed/")({
+export const Route = createFileRoute("/")({
+	// `data-only`: run the auth check on the server (no flash, redirect issued
+	// server-side) while the ReactFlow canvas still renders client-only
+	ssr: "data-only",
+	async beforeLoad({ location }) {
+		const session = await getSession();
+
+		if (!session) {
+			throw redirect({
+				to: "/auth/$path",
+				params: { path: "sign-in" },
+				search: { redirectTo: location.href },
+			});
+		}
+
+		return { session };
+	},
 	component: Dashboard,
 });
 
