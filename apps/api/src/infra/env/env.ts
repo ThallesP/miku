@@ -12,7 +12,7 @@ export const env = createEnv({
 			.default("postgres://postgres:postgres@localhost:5432/miku"),
 		// required in production; better-auth falls back to a dev secret
 		BETTER_AUTH_SECRET: z.string().optional(),
-		WEB_URL: z.url().default("http://localhost:3000"),
+		WEB_URL: z.url().default("http://localhost:3001"),
 		// tailnet tag that identifies a miku worker during discovery
 		WORKER_TAG: z.string().default("tag:miku-worker"),
 		// port a worker exposes for the control plane to push its token to
