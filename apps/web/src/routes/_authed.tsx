@@ -16,17 +16,19 @@ import { authClient } from "@/lib/auth-client";
 // the auth UI components don't refetch it.
 export const Route = createFileRoute("/_authed")({
 	ssr: false,
-	async beforeLoad({ context }) {
-		// only runs on the client (route is `ssr: false`); guard the server pass
-		// so it never redirects authenticated users before cookies are available
-		if (typeof document === "undefined") {
-			return;
-		}
-
+	async beforeLoad({ context, location }) {
+		// `ssr: false` makes this run client-only, so the session cookie is
+		// available and `getSession` resolves before anything renders
 		const session = await ensureSession(context.queryClient, authClient);
 
 		if (!session) {
-			throw redirect({ to: "/auth/$path", params: { path: "sign-in" } });
+			// carry the intended destination so the auth UI returns here after
+			// sign-in (AuthProvider reads `redirectTo` from the query string)
+			throw redirect({
+				to: "/auth/$path",
+				params: { path: "sign-in" },
+				search: { redirectTo: location.href },
+			});
 		}
 
 		return { session };
