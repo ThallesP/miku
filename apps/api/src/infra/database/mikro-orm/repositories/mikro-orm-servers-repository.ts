@@ -24,6 +24,14 @@ export class MikroOrmServersRepository implements ServersRepository {
 		return this.em.find(Server, {}, { orderBy: { joinedAt: "asc" } });
 	}
 
+	findManyByOrganization(organizationId: string): Promise<Server[]> {
+		return this.em.find(
+			Server,
+			{ organizationId },
+			{ orderBy: { joinedAt: "asc" } },
+		);
+	}
+
 	async create(server: Server): Promise<void> {
 		this.em.persist(server);
 		await this.em.flush();

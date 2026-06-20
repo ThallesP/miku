@@ -2,6 +2,10 @@ import { type Result, type Server, success } from "@miku/db";
 import { Injectable } from "@nestjs/common";
 import { ServersRepository } from "../repositories/servers-repository";
 
+interface FetchServersUseCaseRequest {
+	organizationId: string;
+}
+
 type FetchServersUseCaseResponse = Result<
 	null,
 	{
@@ -13,8 +17,11 @@ type FetchServersUseCaseResponse = Result<
 export class FetchServersUseCase {
 	constructor(private serversRepository: ServersRepository) {}
 
-	async execute(): Promise<FetchServersUseCaseResponse> {
-		const servers = await this.serversRepository.findMany();
+	async execute({
+		organizationId,
+	}: FetchServersUseCaseRequest): Promise<FetchServersUseCaseResponse> {
+		const servers =
+			await this.serversRepository.findManyByOrganization(organizationId);
 
 		return success({
 			servers,

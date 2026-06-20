@@ -1,5 +1,6 @@
 import { apiKey } from "@better-auth/api-key";
 import { betterAuth } from "better-auth";
+import { APIError } from "better-auth/api";
 import { organization } from "better-auth/plugins/organization";
 import { Pool } from "pg";
 
@@ -33,6 +34,10 @@ export const auth = betterAuth({
 			enableMetadata: true,
 			rateLimit: { enabled: false },
 			defaultPrefix: "miku_",
+			// key names are full worker hostnames; the plugin defaults to 32, and an
+			// FQDN can reach 253 chars (createApiKey throws INVALID_NAME_LENGTH past
+			// the cap)
+			maximumNameLength: 253,
 		}),
 	],
 	// human sessions; refreshed on use
@@ -72,7 +77,12 @@ export const auth = betterAuth({
 					});
 
 					if (!org) {
-						throw new Error("failed to create the user's organization");
+						console.error(
+							`failed to provision an organization for user ${session.userId}`,
+						);
+						throw new APIError("INTERNAL_SERVER_ERROR", {
+							message: "Failed to provision your organization.",
+						});
 					}
 
 					return { data: { ...session, activeOrganizationId: org.id } };
