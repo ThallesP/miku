@@ -10,13 +10,20 @@ const validAuthPaths = new Set<string>(Object.values(viewPaths.auth));
 
 export const Route = createFileRoute("/auth/$path")({
 	ssr: false,
+	// `_authed` carries the intended destination here on redirect; AuthProvider
+	// reads `redirectTo` from the query string to return there after sign-in
+	validateSearch: (search: Record<string, unknown>): { redirectTo?: string } =>
+		typeof search.redirectTo === "string"
+			? { redirectTo: search.redirectTo }
+			: {},
 	async beforeLoad({ params: { path } }) {
 		if (!validAuthPaths.has(path)) {
 			throw redirect({ to: "/" });
 		}
 
-		// already signed in? skip the auth page and go to the app
-		if (typeof document !== "undefined") {
+		// already signed in? skip the auth entry pages — but let `sign-out` run,
+		// otherwise an authenticated user could never reach it (it's in viewPaths)
+		if (typeof document !== "undefined" && path !== viewPaths.auth.signOut) {
 			const { data: session } = await authClient.getSession();
 
 			if (session) {
