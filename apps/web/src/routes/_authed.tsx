@@ -17,12 +17,8 @@ import { authClient } from "@/lib/auth-client";
 export const Route = createFileRoute("/_authed")({
 	ssr: false,
 	async beforeLoad({ context, location }) {
-		// only runs on the client (route is `ssr: false`); guard the server pass
-		// so it never redirects authenticated users before cookies are available
-		if (typeof document === "undefined") {
-			return;
-		}
-
+		// `ssr: false` makes this run client-only, so the session cookie is
+		// available and `getSession` resolves before anything renders
 		const session = await ensureSession(context.queryClient, authClient);
 
 		if (!session) {

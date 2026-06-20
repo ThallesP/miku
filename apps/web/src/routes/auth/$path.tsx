@@ -6,7 +6,14 @@ import { authClient } from "@/lib/auth-client";
 
 // the only public surface of the app: the better-auth views (sign-in, sign-up,
 // forgot/reset password, verify email, sign-out)
-const validAuthPaths = new Set<string>(Object.values(viewPaths.auth));
+const authViewPaths = Object.values(viewPaths.auth);
+const validAuthPaths = new Set<string>(authViewPaths);
+
+// guest-only entry views: every auth view except `sign-out`, which has to run
+// while the user is still authenticated (it's the app's only logout path)
+const guestOnlyPaths = new Set<string>(
+	authViewPaths.filter((path) => path !== viewPaths.auth.signOut),
+);
 
 export const Route = createFileRoute("/auth/$path")({
 	ssr: false,
@@ -21,9 +28,9 @@ export const Route = createFileRoute("/auth/$path")({
 			throw redirect({ to: "/" });
 		}
 
-		// already signed in? skip the auth entry pages — but let `sign-out` run,
-		// otherwise an authenticated user could never reach it (it's in viewPaths)
-		if (typeof document !== "undefined" && path !== viewPaths.auth.signOut) {
+		// send already-signed-in users to the app from the guest-only views
+		// (sign-out is intentionally excluded so it can run while authenticated)
+		if (guestOnlyPaths.has(path)) {
 			const { data: session } = await authClient.getSession();
 
 			if (session) {
