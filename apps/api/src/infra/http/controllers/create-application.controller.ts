@@ -2,6 +2,7 @@ import { TypedBody, TypedRoute } from "@nestia/core";
 import { BadRequestException, Controller } from "@nestjs/common";
 import type { tags } from "typia";
 import { CreateApplicationUseCase } from "../../../domain/canvas/application/use-cases/create-application";
+import { AuthMethods } from "../../auth/auth-methods.decorator";
 import {
 	type ApplicationHTTP,
 	ApplicationPresenter,
@@ -14,6 +15,7 @@ export interface CreateApplicationBody {
 }
 
 @Controller("applications")
+@AuthMethods("session")
 export class CreateApplicationController {
 	constructor(private createApplication: CreateApplicationUseCase) {}
 

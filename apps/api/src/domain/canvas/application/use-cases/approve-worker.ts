@@ -11,16 +11,14 @@ import { auth } from "../../../../infra/auth/auth";
 import { WorkerProvisioner } from "../discovery/worker-provisioner";
 import { ServersRepository } from "../repositories/servers-repository";
 
-// better-auth rejects api key names longer than this
-const MAX_KEY_NAME_LENGTH = 32;
-
 interface ApproveWorkerUseCaseRequest {
 	hostname: string;
 	address: string;
-	// the organization the approving user belongs to — the worker's api key is
+	// the organization the approving member belongs to — the worker's api key is
 	// scoped to it, and the resulting server belongs to it
 	organizationId: string;
-	// the approving user; owns the organization and so may mint its api keys
+	// the approving member's user id; better-auth checks their org role's
+	// apiKey:create permission when minting the key
 	userId: string;
 }
 
@@ -47,14 +45,15 @@ export class ApproveWorkerUseCase {
 		// mint the worker's org-scoped api key straight through better-auth. we
 		// skip a clean-architecture port here on purpose: the control plane no
 		// longer owns a synthetic fleet account, so keys just belong to the
-		// approving user's org. the key is organization-referenced (see auth.ts)
-		// and created under the approving user, who owns the org and therefore
-		// passes the apiKey:create permission check.
+		// approving member's org. the key is organization-referenced (see auth.ts)
+		// and created under the approving member, whose org role must allow
+		// apiKey:create. hostnames are validated as non-blank at the http boundary
+		// (see ApproveWorkerBody), so Server.create won't reject a minted key.
 		const credential = await auth.api.createApiKey({
 			body: {
 				organizationId,
 				userId,
-				name: hostname.slice(0, MAX_KEY_NAME_LENGTH),
+				name: hostname,
 				metadata: { hostname },
 			},
 		});

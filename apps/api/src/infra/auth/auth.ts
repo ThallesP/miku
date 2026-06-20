@@ -24,9 +24,10 @@ export const auth = betterAuth({
 		organization(),
 		// workers authenticate with an organization-scoped api key sent as
 		// `x-api-key`. org-referenced keys deliberately don't mock a session, so
-		// the worker heartbeat uses a dedicated guard (WorkerAuthGuard) that calls
-		// auth.api.verifyApiKey — humans keep using session cookies via the global
-		// AuthGuard. rate limiting is off because workers heartbeat ~every 5s.
+		// the worker heartbeat uses a dedicated guard (ApiKeyAuthGuard) that calls
+		// auth.api.verifyApiKey — humans keep using session cookies. both are
+		// dispatched by the global AuthenticationGuard via @AuthMethods. rate
+		// limiting is off because workers heartbeat ~every 5s.
 		apiKey({
 			references: "organization",
 			enableMetadata: true,

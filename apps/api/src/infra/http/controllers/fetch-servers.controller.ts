@@ -1,12 +1,14 @@
 import { TypedRoute } from "@nestia/core";
 import { BadRequestException, Controller } from "@nestjs/common";
 import { FetchServersUseCase } from "../../../domain/canvas/application/use-cases/fetch-servers";
+import { AuthMethods } from "../../auth/auth-methods.decorator";
 import {
 	type ServerHTTP,
 	ServerPresenter,
 } from "../presenters/server-presenter";
 
 @Controller("servers")
+@AuthMethods("session")
 export class FetchServersController {
 	constructor(private fetchServers: FetchServersUseCase) {}
 

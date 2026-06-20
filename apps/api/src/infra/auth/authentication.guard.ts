@@ -6,15 +6,16 @@ import {
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 
+import { ApiKeyAuthGuard } from "./api-key-auth.guard";
 import { AUTH_METHODS_KEY, type AuthMethod } from "./auth-methods.decorator";
+import { PUBLIC_KEY } from "./public.decorator";
 import { SessionAuthGuard } from "./session-auth.guard";
-import { WorkerAuthGuard } from "./worker-auth.guard";
 
-// the single global guard. it reads `@AuthMethods(...)` (defaulting to session)
-// and delegates to the guard for each accepted method, allowing the request as
-// soon as one of them authenticates it. this replaces the package's global
-// session guard so routes opt into worker (api key) auth declaratively, instead
-// of opting out of auth entirely with `@AllowAnonymous`.
+// the single global guard. `@Public()` routes skip auth entirely. otherwise a
+// route MUST declare how it authenticates with `@AuthMethods(...)`; the guard
+// delegates to each accepted method and allows the request as soon as one
+// passes. a route that declares nothing is denied — auth is fail-closed, opted
+// into per route rather than out of with `@AllowAnonymous`.
 @Injectable()
 export class AuthenticationGuard implements CanActivate {
 	private readonly guards: Record<AuthMethod, CanActivate>;
@@ -22,19 +23,28 @@ export class AuthenticationGuard implements CanActivate {
 	constructor(
 		private reflector: Reflector,
 		sessionGuard: SessionAuthGuard,
-		workerGuard: WorkerAuthGuard,
+		apiKeyGuard: ApiKeyAuthGuard,
 	) {
-		this.guards = { session: sessionGuard, apiKey: workerGuard };
+		this.guards = { session: sessionGuard, apiKey: apiKeyGuard };
 	}
 
 	async canActivate(context: ExecutionContext): Promise<boolean> {
+		const targets = [context.getHandler(), context.getClass()];
+
+		if (this.reflector.getAllAndOverride<boolean>(PUBLIC_KEY, targets)) {
+			return true;
+		}
+
 		const methods = this.reflector.getAllAndOverride<AuthMethod[]>(
 			AUTH_METHODS_KEY,
-			[context.getHandler(), context.getClass()],
-		) ?? ["session"];
+			targets,
+		);
 
-		// try methods in order; the first that authenticates wins. genuine errors
-		// (a guard throwing) propagate — only an unauthenticated request 401s.
+		// fail closed: a route that declares no auth methods is denied
+		if (!methods?.length) {
+			throw new UnauthorizedException();
+		}
+
 		for (const method of methods) {
 			if (await this.guards[method].canActivate(context)) {
 				return true;
