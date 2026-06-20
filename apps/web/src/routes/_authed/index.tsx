@@ -12,15 +12,14 @@ import { Plus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
-	API_URL,
 	type ApplicationHTTP,
 	apiClient,
 	type ServerHTTP,
 } from "@/lib/api-client";
+import { API_URL } from "@/lib/env";
 
 export const Route = createFileRoute("/_authed/")({
 	component: Dashboard,
-	ssr: false,
 });
 
 type ApplicationNodeData = ApplicationHTTP & Record<string, unknown>;

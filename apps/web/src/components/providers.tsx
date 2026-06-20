@@ -18,9 +18,7 @@ export function Providers({ children }: { children: ReactNode }) {
 		>
 			<AuthProvider
 				authClient={authClient}
-				emailAndPassword={{ requireEmailVerification: false }}
 				navigate={navigate}
-				redirectTo="/"
 				Link={({ href, ...props }) => <Link to={href} {...props} />}
 			>
 				{children}
