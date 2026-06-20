@@ -24,9 +24,10 @@ export const auth = betterAuth({
 		organization(),
 		// workers authenticate with an organization-scoped api key sent as
 		// `x-api-key`. org-referenced keys deliberately don't mock a session, so
-		// the worker heartbeat uses a dedicated guard (WorkerAuthGuard) that calls
-		// auth.api.verifyApiKey — humans keep using session cookies via the global
-		// AuthGuard. rate limiting is off because workers heartbeat ~every 5s.
+		// the worker heartbeat uses a dedicated guard (ApiKeyAuthGuard) that calls
+		// auth.api.verifyApiKey — humans keep using session cookies. both are
+		// dispatched by the global AuthenticationGuard via @AuthMethods. rate
+		// limiting is off because workers heartbeat ~every 5s.
 		apiKey({
 			references: "organization",
 			enableMetadata: true,
@@ -38,6 +39,46 @@ export const auth = betterAuth({
 	session: {
 		expiresIn: DAY_SECONDS * 30,
 		updateAge: DAY_SECONDS,
+	},
+	databaseHooks: {
+		session: {
+			create: {
+				// every human acts within an organization. on session creation
+				// (sign-up or login) set the user's org as active — creating a
+				// personal org the first time, via better-auth's own adapter +
+				// createOrganization — so controllers can always assume one exists.
+				before: async (session) => {
+					// `auth` is self-referential here, so its adapter is untyped — cast
+					const ctx = await auth.$context;
+
+					const member = (await ctx.adapter.findOne({
+						model: "member",
+						where: [{ field: "userId", value: session.userId }],
+					})) as { organizationId: string } | null;
+
+					if (member) {
+						return {
+							data: { ...session, activeOrganizationId: member.organizationId },
+						};
+					}
+
+					const org = await auth.api.createOrganization({
+						body: {
+							name: "Personal",
+							slug: `org-${session.userId}`,
+							userId: session.userId,
+							keepCurrentActiveOrganization: true,
+						},
+					});
+
+					if (!org) {
+						throw new Error("failed to create the user's organization");
+					}
+
+					return { data: { ...session, activeOrganizationId: org.id } };
+				},
+			},
+		},
 	},
 });
 

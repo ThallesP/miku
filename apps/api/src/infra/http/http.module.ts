@@ -1,6 +1,5 @@
 import { Module } from "@nestjs/common";
 
-import { WorkerCredentials } from "../../domain/canvas/application/discovery/worker-credentials";
 import { WorkerDiscovery } from "../../domain/canvas/application/discovery/worker-discovery";
 import { WorkerProvisioner } from "../../domain/canvas/application/discovery/worker-provisioner";
 import { ApproveWorkerUseCase } from "../../domain/canvas/application/use-cases/approve-worker";
@@ -10,7 +9,6 @@ import { FetchApplicationsUseCase } from "../../domain/canvas/application/use-ca
 import { FetchServersUseCase } from "../../domain/canvas/application/use-cases/fetch-servers";
 import { HeartbeatServerUseCase } from "../../domain/canvas/application/use-cases/heartbeat-server";
 import { MoveApplicationUseCase } from "../../domain/canvas/application/use-cases/move-application";
-import { BetterAuthWorkerCredentials } from "../auth/better-auth-worker-credentials";
 import { DatabaseModule } from "../database/database.module";
 import { HttpWorkerProvisioner } from "../discovery/http-worker-provisioner";
 import { TailscaleWorkerDiscovery } from "../discovery/tailscale-worker-discovery";
@@ -46,7 +44,6 @@ import { MoveApplicationController } from "./controllers/move-application.contro
 		HeartbeatServerUseCase,
 		{ provide: WorkerDiscovery, useClass: TailscaleWorkerDiscovery },
 		{ provide: WorkerProvisioner, useClass: HttpWorkerProvisioner },
-		{ provide: WorkerCredentials, useClass: BetterAuthWorkerCredentials },
 	],
 })
 export class HttpModule {}
