@@ -1,10 +1,17 @@
 {
 	"$schema": "https://turbo.build/schema.json",
 	"tasks": {
+		"//#docker:up": {
+			"cache": false
+		},
+		"@miku/db#migrate": {
+			"cache": false,
+			"dependsOn": ["//#docker:up"]
+		},
 		"dev": {
 			"cache": false,
 			"persistent": true,
-			"dependsOn": ["^build"]
+			"dependsOn": ["^build", "@miku/db#migrate"]
 		},
 		"build": {
 			"dependsOn": ["^build"],

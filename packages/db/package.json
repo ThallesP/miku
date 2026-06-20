@@ -14,6 +14,7 @@
 		"check": "tsc --noEmit",
 		"lint": "biome lint --config-path ../../biome.json .",
 		"format": "biome format --config-path ../../biome.json .",
+		"migrate": "bun run migration:up",
 		"migration:create": "bun ./node_modules/@mikro-orm/cli/cli.js migration:create",
 		"migration:up": "bun ./node_modules/@mikro-orm/cli/cli.js migration:up",
 		"migration:down": "bun ./node_modules/@mikro-orm/cli/cli.js migration:down",

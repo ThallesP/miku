@@ -8,6 +8,7 @@
 	],
 	"scripts": {
 		"dev": "turbo dev",
+		"docker:up": "docker compose up -d --wait",
 		"build": "turbo build",
 		"check": "biome check . && turbo check",
 		"lint": "turbo lint",
