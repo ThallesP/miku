@@ -40,52 +40,46 @@ export const auth = betterAuth({
 		expiresIn: DAY_SECONDS * 30,
 		updateAge: DAY_SECONDS,
 	},
-	// every human acts within an organization. when a session is created (signup
-	// or login), set the user's org as the active one — creating a personal org
-	// the first time — so controllers can assume an active org without checking.
 	databaseHooks: {
 		session: {
 			create: {
-				before: async (session) => ({
-					data: {
-						...session,
-						activeOrganizationId: await ensureOrganization(session.userId),
-					},
-				}),
+				// every human acts within an organization. on session creation
+				// (sign-up or login) set the user's org as active — creating a
+				// personal org the first time, via better-auth's own adapter +
+				// createOrganization — so controllers can always assume one exists.
+				before: async (session) => {
+					// `auth` is self-referential here, so its adapter is untyped — cast
+					const ctx = await auth.$context;
+
+					const member = (await ctx.adapter.findOne({
+						model: "member",
+						where: [{ field: "userId", value: session.userId }],
+					})) as { organizationId: string } | null;
+
+					if (member) {
+						return {
+							data: { ...session, activeOrganizationId: member.organizationId },
+						};
+					}
+
+					const org = await auth.api.createOrganization({
+						body: {
+							name: "Personal",
+							slug: `org-${session.userId}`,
+							userId: session.userId,
+							keepCurrentActiveOrganization: true,
+						},
+					});
+
+					if (!org) {
+						throw new Error("failed to create the user's organization");
+					}
+
+					return { data: { ...session, activeOrganizationId: org.id } };
+				},
 			},
 		},
 	},
 });
 
 export type Auth = typeof auth;
-
-// the user's organization, creating a personal one on first use. uses
-// better-auth's own adapter + createOrganization rather than reimplementing org
-// provisioning. onboarding can let the user rename the org later.
-async function ensureOrganization(userId: string): Promise<string> {
-	const ctx = await auth.$context;
-
-	const member = await ctx.adapter.findOne<{ organizationId: string }>({
-		model: "member",
-		where: [{ field: "userId", value: userId }],
-	});
-
-	if (member) {
-		return member.organizationId;
-	}
-
-	const org = await auth.api.createOrganization({
-		body: {
-			name: "Personal",
-			slug: `org-${userId}`,
-			userId,
-			keepCurrentActiveOrganization: true,
-		},
-	});
-
-	if (!org) {
-		throw new Error("failed to create the user's organization");
-	}
-
-	return org.id;
-}
