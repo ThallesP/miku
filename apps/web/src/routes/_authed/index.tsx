@@ -18,7 +18,10 @@ import {
 	type ServerHTTP,
 } from "@/lib/api-client";
 
-export const Route = createFileRoute("/")({ component: Dashboard, ssr: false });
+export const Route = createFileRoute("/_authed/")({
+	component: Dashboard,
+	ssr: false,
+});
 
 type ApplicationNodeData = ApplicationHTTP & Record<string, unknown>;
 type ServerNodeData = ServerHTTP & Record<string, unknown>;
@@ -78,7 +81,9 @@ function Dashboard() {
 	useEffect(() => {
 		refresh();
 
-		const events = new EventSource(`${API_URL}/events`);
+		const events = new EventSource(`${API_URL}/events`, {
+			withCredentials: true,
+		});
 		events.onmessage = () => {
 			refresh();
 		};
