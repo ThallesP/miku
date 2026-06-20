@@ -5,7 +5,7 @@ import { ChangePublisher } from "../events/change-publisher";
 import { ServersRepository } from "../repositories/servers-repository";
 
 interface HeartbeatServerUseCaseRequest {
-	userId: string;
+	apiKeyId: string;
 }
 
 type HeartbeatServerUseCaseResponse = Result<
@@ -23,9 +23,9 @@ export class HeartbeatServerUseCase {
 	) {}
 
 	async execute({
-		userId,
+		apiKeyId,
 	}: HeartbeatServerUseCaseRequest): Promise<HeartbeatServerUseCaseResponse> {
-		const server = await this.serversRepository.findByUserId(userId);
+		const server = await this.serversRepository.findByApiKeyId(apiKeyId);
 
 		if (!server) {
 			return failure(new ResourceNotFoundError());

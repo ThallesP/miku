@@ -1,8 +1,12 @@
 import { Module } from "@nestjs/common";
+import { APP_GUARD } from "@nestjs/core";
 import { AuthModule as BetterAuthModule } from "@thallesp/nestjs-better-auth";
 import { getMigrations } from "better-auth/db/migration";
 
-import { auth } from "./auth.instance";
+import { ApiKeyAuthGuard } from "./api-key-auth.guard";
+import { auth } from "./auth";
+import { AuthenticationGuard } from "./authentication.guard";
+import { SessionAuthGuard } from "./session-auth.guard";
 
 @Module({
 	imports: [
@@ -14,7 +18,16 @@ import { auth } from "./auth.instance";
 
 				return { auth };
 			},
+			// we replace the package's global session guard with our own
+			// AuthenticationGuard, which supports both human (session) and machine
+			// (api key) auth via @AuthMethods (see authentication.guard.ts)
+			disableGlobalAuthGuard: true,
 		}),
+	],
+	providers: [
+		SessionAuthGuard,
+		ApiKeyAuthGuard,
+		{ provide: APP_GUARD, useClass: AuthenticationGuard },
 	],
 })
 export class AuthModule {}

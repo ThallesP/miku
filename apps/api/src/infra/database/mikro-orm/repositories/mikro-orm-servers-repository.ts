@@ -16,12 +16,20 @@ export class MikroOrmServersRepository implements ServersRepository {
 		return this.em.findOne(Server, { name });
 	}
 
-	findByUserId(userId: string): Promise<Server | null> {
-		return this.em.findOne(Server, { userId });
+	findByApiKeyId(apiKeyId: string): Promise<Server | null> {
+		return this.em.findOne(Server, { apiKeyId });
 	}
 
 	findMany(): Promise<Server[]> {
 		return this.em.find(Server, {}, { orderBy: { joinedAt: "asc" } });
+	}
+
+	findManyByOrganization(organizationId: string): Promise<Server[]> {
+		return this.em.find(
+			Server,
+			{ organizationId },
+			{ orderBy: { joinedAt: "asc" } },
+		);
 	}
 
 	async create(server: Server): Promise<void> {

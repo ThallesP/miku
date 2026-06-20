@@ -2,6 +2,7 @@ import { TypedBody, TypedParam, TypedRoute } from "@nestia/core";
 import { Controller, NotFoundException } from "@nestjs/common";
 import type { tags } from "typia";
 import { MoveApplicationUseCase } from "../../../domain/canvas/application/use-cases/move-application";
+import { AuthMethods } from "../../auth/auth-methods.decorator";
 import {
 	type ApplicationHTTP,
 	ApplicationPresenter,
@@ -14,6 +15,7 @@ export interface MoveApplicationBody {
 }
 
 @Controller("applications")
+@AuthMethods("session")
 export class MoveApplicationController {
 	constructor(private moveApplication: MoveApplicationUseCase) {}
 

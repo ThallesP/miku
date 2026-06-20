@@ -1,6 +1,7 @@
 import { TypedRoute } from "@nestia/core";
 import { BadRequestException, Controller } from "@nestjs/common";
 import { DiscoverWorkersUseCase } from "../../../domain/canvas/application/use-cases/discover-workers";
+import { AuthMethods } from "../../auth/auth-methods.decorator";
 
 export interface DiscoveredWorkerHTTP {
 	hostname: string;
@@ -9,6 +10,7 @@ export interface DiscoveredWorkerHTTP {
 }
 
 @Controller("workers")
+@AuthMethods("session")
 export class DiscoverWorkersController {
 	constructor(private discoverWorkers: DiscoverWorkersUseCase) {}
 
