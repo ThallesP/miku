@@ -27,15 +27,16 @@ export class Server {
 	@Property({ type: "datetime" })
 	lastSeenAt: Date = new Date();
 
-	// the better-auth organization the worker's api key is scoped to;
-	// null until the worker is approved/provisioned
-	@Property({ type: "string", nullable: true })
-	organizationId?: string;
+	// the better-auth organization the worker's api key is scoped to. every
+	// server belongs to the organization of the user who approved it — there is
+	// no individual-user-owned or unattached server.
+	@Property({ type: "string" })
+	organizationId: string;
 
 	// the better-auth api key id issued to this worker — the worker presents the
 	// key as `x-api-key` when it heartbeats, and we resolve it back to this server
-	@Property({ type: "string", nullable: true })
-	apiKeyId?: string;
+	@Property({ type: "string" })
+	apiKeyId: string;
 
 	// hydration from the database bypasses the constructor (and the field
 	// initializers above) — this only runs for newly registered servers
@@ -43,10 +44,14 @@ export class Server {
 		name: string;
 		address: string;
 		network: string;
+		organizationId: string;
+		apiKeyId: string;
 	}) {
 		this.name = props.name;
 		this.address = props.address;
 		this.network = props.network;
+		this.organizationId = props.organizationId;
+		this.apiKeyId = props.apiKeyId;
 	}
 
 	// computed, not persisted
@@ -54,16 +59,12 @@ export class Server {
 		return Date.now() - this.lastSeenAt.getTime() < ONLINE_THRESHOLD_MS;
 	}
 
-	// associates the worker's org-scoped api key once it has been approved
-	linkCredentials(organizationId: string, apiKeyId: string) {
-		this.organizationId = organizationId;
-		this.apiKeyId = apiKeyId;
-	}
-
 	static create(props: {
 		name: string;
 		address: string;
 		network: string;
+		organizationId: string;
+		apiKeyId: string;
 	}): Result<InvalidNameError, Server> {
 		if (props.name.trim().length === 0) {
 			return failure(new InvalidNameError());

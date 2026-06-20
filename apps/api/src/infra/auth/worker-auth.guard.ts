@@ -15,9 +15,10 @@ interface WorkerRequest extends Request {
 	workerApiKeyId?: string;
 }
 
-// authenticates a worker by its org-scoped api key (`x-api-key`). org-referenced
-// keys don't resolve into a session, so the global session AuthGuard can't see
-// them — workers opt out of it with @AllowAnonymous and use this guard instead.
+// authenticates a worker by its org-scoped api key (`x-api-key`). routes select
+// it with `@AuthMethods("apiKey")`; the global AuthenticationGuard delegates
+// here. returns false (rather than throwing) when the key is missing or invalid
+// so the guard can fall through to another accepted method before 401-ing.
 @Injectable()
 export class WorkerAuthGuard implements CanActivate {
 	async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -25,13 +26,13 @@ export class WorkerAuthGuard implements CanActivate {
 		const key = request.header(API_KEY_HEADER);
 
 		if (!key) {
-			throw new UnauthorizedException();
+			return false;
 		}
 
 		const result = await auth.api.verifyApiKey({ body: { key } });
 
 		if (!result.valid || !result.key) {
-			throw new UnauthorizedException();
+			return false;
 		}
 
 		request.workerApiKeyId = result.key.id;
