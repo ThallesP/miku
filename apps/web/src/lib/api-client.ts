@@ -2,12 +2,17 @@ import api, { type IConnection } from "@miku/sdk";
 import type { CreateApplicationBody } from "@miku/sdk/structures/CreateApplicationBody";
 import type { MoveApplicationBody } from "@miku/sdk/structures/MoveApplicationBody";
 
+import { API_URL } from "./env";
+
 export type { ApplicationHTTP } from "@miku/sdk/structures/ApplicationHTTP";
 export type { ServerHTTP } from "@miku/sdk/structures/ServerHTTP";
 
-export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3100";
-
-const connection: IConnection = { host: API_URL };
+// send the better-auth session cookie with every SDK call; the API is a
+// different origin and its controllers are guarded by `@AuthMethods("session")`
+const connection: IConnection = {
+	host: API_URL,
+	options: { credentials: "include" },
+};
 
 export const apiClient = {
 	applications: {

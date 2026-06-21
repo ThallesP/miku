@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import {
 	Background,
 	BackgroundVariant,
@@ -12,13 +12,32 @@ import { Plus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
-	API_URL,
 	type ApplicationHTTP,
 	apiClient,
 	type ServerHTTP,
 } from "@/lib/api-client";
+import { API_URL } from "@/lib/env";
+import { getSession } from "@/lib/session";
 
-export const Route = createFileRoute("/")({ component: Dashboard, ssr: false });
+export const Route = createFileRoute("/")({
+	// `data-only`: run the auth check on the server (no flash, redirect issued
+	// server-side) while the ReactFlow canvas still renders client-only
+	ssr: "data-only",
+	async beforeLoad({ location }) {
+		const session = await getSession();
+
+		if (!session) {
+			throw redirect({
+				to: "/auth/$path",
+				params: { path: "sign-in" },
+				search: { redirectTo: location.href },
+			});
+		}
+
+		return { session };
+	},
+	component: Dashboard,
+});
 
 type ApplicationNodeData = ApplicationHTTP & Record<string, unknown>;
 type ServerNodeData = ServerHTTP & Record<string, unknown>;
@@ -78,7 +97,9 @@ function Dashboard() {
 	useEffect(() => {
 		refresh();
 
-		const events = new EventSource(`${API_URL}/events`);
+		const events = new EventSource(`${API_URL}/events`, {
+			withCredentials: true,
+		});
 		events.onmessage = () => {
 			refresh();
 		};
