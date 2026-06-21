@@ -17,8 +17,9 @@ const guestOnlyPaths = new Set<string>(
 
 export const Route = createFileRoute("/auth/$path")({
 	ssr: false,
-	// `_authed` carries the intended destination here on redirect; AuthProvider
-	// reads `redirectTo` from the query string to return there after sign-in
+	// protected routes carry the intended destination here on redirect;
+	// AuthProvider reads `redirectTo` from the query string to return there
+	// after sign-in
 	validateSearch: (search: Record<string, unknown>): { redirectTo?: string } =>
 		typeof search.redirectTo === "string"
 			? { redirectTo: search.redirectTo }
