@@ -13,11 +13,4 @@ export namespace ApplicationHTTP {
     y: number;
     createdAt: number;
   };
-  export type o2 = {
-    id: string;
-    name: string;
-    x: number;
-    y: number;
-    createdAt: number;
-  };
 }

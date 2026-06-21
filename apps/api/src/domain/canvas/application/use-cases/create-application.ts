@@ -44,7 +44,7 @@ export class CreateApplicationUseCase {
 		const application = result.value;
 
 		await this.applicationsRepository.create(application);
-		this.changePublisher.publish({ type: "applications" });
+		this.changePublisher.publish();
 
 		return success({
 			application,

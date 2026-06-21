@@ -1,3 +1,4 @@
+import { WebSocketAdaptor } from "@nestia/core";
 import { NestFactory } from "@nestjs/core";
 
 import { AppModule } from "./app.module";
@@ -16,6 +17,10 @@ async function bootstrap() {
 		origin: env.WEB_URL,
 		credentials: true,
 	});
+
+	// serves the nestia @WebSocketRoute controllers (the realtime canvas) over the
+	// same HTTP server
+	await WebSocketAdaptor.upgrade(app);
 
 	await app.listen(env.PORT);
 }

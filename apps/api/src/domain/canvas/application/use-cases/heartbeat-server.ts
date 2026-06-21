@@ -33,7 +33,7 @@ export class HeartbeatServerUseCase {
 
 		server.lastSeenAt = new Date();
 		await this.serversRepository.save(server);
-		this.changePublisher.publish({ type: "servers" });
+		this.changePublisher.publish();
 
 		return success({
 			server,

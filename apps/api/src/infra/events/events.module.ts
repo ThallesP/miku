@@ -1,16 +1,16 @@
 import { Module } from "@nestjs/common";
 
 import { ChangePublisher } from "../../domain/canvas/application/events/change-publisher";
-import { ChangeStream } from "./change-stream";
+import { CanvasHub } from "./canvas-hub";
 
 @Module({
 	providers: [
-		ChangeStream,
+		CanvasHub,
 		{
 			provide: ChangePublisher,
-			useExisting: ChangeStream,
+			useExisting: CanvasHub,
 		},
 	],
-	exports: [ChangePublisher, ChangeStream],
+	exports: [ChangePublisher, CanvasHub],
 })
 export class EventsModule {}

@@ -14,9 +14,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	type ApplicationHTTP,
 	apiClient,
+	type CanvasConnection,
 	type ServerHTTP,
 } from "@/lib/api-client";
-import { API_URL } from "@/lib/env";
 import { getSession } from "@/lib/session";
 
 export const Route = createFileRoute("/")({
@@ -83,6 +83,8 @@ function Dashboard() {
 	const [servers, setServers] = useState<ServerHTTP[]>([]);
 	const [nodes, setNodes, onNodesChange] = useNodesState<CanvasNode>([]);
 	const draggingRef = useRef(false);
+	const canvasRef = useRef<CanvasConnection | null>(null);
+	const lastMoveRef = useRef(0);
 
 	const refresh = useCallback(async () => {
 		const [nextApplications, nextServers] = await Promise.all([
@@ -97,17 +99,39 @@ function Dashboard() {
 	useEffect(() => {
 		refresh();
 
-		const events = new EventSource(`${API_URL}/events`, {
-			withCredentials: true,
+		// realtime canvas: the server pushes other people's moves (so we update
+		// that node live) and a "changed" ping for everything else (so we refetch)
+		const pending = apiClient.connectCanvas({
+			moved: ({ id, x, y }) =>
+				setApplications((prev) =>
+					prev.map((app) => (app.id === id ? { ...app, x, y } : app)),
+				),
+			changed: () => refresh(),
 		});
-		events.onmessage = () => {
-			refresh();
-		};
+		pending.then((canvas) => {
+			canvasRef.current = canvas;
+		});
 
 		return () => {
-			events.close();
+			canvasRef.current = null;
+			pending.then((canvas) => canvas.connector.close());
 		};
 	}, [refresh]);
+
+	// send our own drag to the server, throttled so we don't flood it while still
+	// guaranteeing the final resting position lands (force = true on drag stop)
+	const sendMove = useCallback(
+		(id: string, x: number, y: number, force = false) => {
+			const now = Date.now();
+			if (!force && now - lastMoveRef.current < 50) {
+				return;
+			}
+
+			lastMoveRef.current = now;
+			canvasRef.current?.driver.move({ id, x, y }).catch(() => {});
+		},
+		[],
+	);
 
 	useEffect(() => {
 		if (draggingRef.current) {
@@ -139,13 +163,24 @@ function Dashboard() {
 				onNodeDragStart={() => {
 					draggingRef.current = true;
 				}}
-				onNodeDragStop={async (_event, node) => {
+				onNodeDrag={(_event, node) => {
+					if (node.type === "application") {
+						const { id } = node.data as ApplicationHTTP;
+						sendMove(id, node.position.x, node.position.y);
+					}
+				}}
+				onNodeDragStop={(_event, node) => {
 					draggingRef.current = false;
 
 					if (node.type === "application") {
-						await apiClient.applications.move(
-							(node.data as ApplicationHTTP).id,
-							{ x: node.position.x, y: node.position.y },
+						const { id } = node.data as ApplicationHTTP;
+						sendMove(id, node.position.x, node.position.y, true);
+						setApplications((prev) =>
+							prev.map((app) =>
+								app.id === id
+									? { ...app, x: node.position.x, y: node.position.y }
+									: app,
+							),
 						);
 					}
 				}}
