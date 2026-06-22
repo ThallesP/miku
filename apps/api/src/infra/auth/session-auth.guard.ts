@@ -3,10 +3,10 @@ import {
 	type ExecutionContext,
 	Injectable,
 } from "@nestjs/common";
+import { fromNodeHeaders } from "better-auth/node";
 import type { Request } from "express";
 
 import { auth } from "./auth";
-import { getSessionFromHeaders } from "./session";
 
 type Session = Awaited<ReturnType<typeof auth.api.getSession>>;
 
@@ -26,7 +26,9 @@ export class SessionAuthGuard implements CanActivate {
 	async canActivate(context: ExecutionContext): Promise<boolean> {
 		const request = context.switchToHttp().getRequest<SessionRequest>();
 
-		const session = await getSessionFromHeaders(request.headers);
+		const session = await auth.api.getSession({
+			headers: fromNodeHeaders(request.headers),
+		});
 
 		if (!session) {
 			return false;

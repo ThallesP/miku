@@ -2,10 +2,11 @@ import type { IncomingMessage } from "node:http";
 import { MikroORM, RequestContext } from "@mikro-orm/core";
 import { WebSocketRoute } from "@nestia/core";
 import { Controller } from "@nestjs/common";
+import { fromNodeHeaders } from "better-auth/node";
 import type { Driver, WebSocketAcceptor } from "tgrid";
 
 import { MoveApplicationUseCase } from "../../../domain/canvas/application/use-cases/move-application";
-import { getSessionFromHeaders } from "../../auth/session";
+import { auth } from "../../auth/auth";
 import { CanvasBroadcaster } from "../../events/canvas-broadcaster";
 import type { CanvasListener, CanvasProvider } from "./canvas.protocol";
 
@@ -54,6 +55,9 @@ export class CanvasController {
 		// tgrid doesn't expose the upgrade request, but it carries the cookies.
 		const { headers } = (acceptor as unknown as { request_: IncomingMessage })
 			.request_;
-		return (await getSessionFromHeaders(headers)) !== null;
+		const session = await auth.api.getSession({
+			headers: fromNodeHeaders(headers),
+		});
+		return session !== null;
 	}
 }
