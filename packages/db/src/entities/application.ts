@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { Embedded, Entity, PrimaryKey, Property } from "@mikro-orm/core";
 
 import type { InvalidNameError } from "../errors/invalid-name-error";
+import { ApplicationCreated, ApplicationMoved } from "../events";
 import { type Result, success } from "../result";
 import { AggregateRoot } from "./aggregate-root";
 import { Position } from "./position";
@@ -45,12 +46,7 @@ export class Application extends AggregateRoot {
 	// publishes it once the change commits
 	set position(value: Position) {
 		this._position = value;
-		this.record({
-			type: "application.moved",
-			id: this.id,
-			x: value.x,
-			y: value.y,
-		});
+		this.record(new ApplicationMoved(this.id, value.x, value.y));
 	}
 
 	static create(props: {
@@ -58,7 +54,7 @@ export class Application extends AggregateRoot {
 		position: Position;
 	}): Result<InvalidNameError, Application> {
 		const application = new Application(props);
-		application.record({ type: "application.created" });
+		application.record(new ApplicationCreated(application.id));
 		return success(application);
 	}
 }

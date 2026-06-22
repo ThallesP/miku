@@ -1,9 +1,4 @@
-// The structural shape of a domain event. The API layer's precise ChangeEvent
-// union satisfies this, so entities can record events without importing (or
-// depending on) the wire vocabulary — keeping @miku/db framework-free.
-export interface DomainEvent {
-	readonly type: string;
-}
+import type { DomainEvent } from "../events";
 
 // A minimal aggregate base: an entity records domain events as a side effect of
 // its own methods/setters, and infrastructure drains them after the change

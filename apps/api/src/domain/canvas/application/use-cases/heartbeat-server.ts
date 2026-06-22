@@ -1,4 +1,10 @@
-import { failure, type Result, type Server, success } from "@miku/db";
+import {
+	failure,
+	type Result,
+	type Server,
+	ServerChanged,
+	success,
+} from "@miku/db";
 import { Injectable } from "@nestjs/common";
 import { ResourceNotFoundError } from "../../../../core/errors/errors/resource-not-found-error";
 import { ChangePublisher } from "../events/change-publisher";
@@ -36,7 +42,7 @@ export class HeartbeatServerUseCase {
 		// a heartbeat is telemetry, not an aggregate state transition worth
 		// modelling as a domain event — so publish the refetch ping app-layer
 		// rather than authoring it on the Server entity
-		this.changePublisher.publish({ type: "server.changed" });
+		this.changePublisher.publish(new ServerChanged());
 
 		return success({
 			server,
