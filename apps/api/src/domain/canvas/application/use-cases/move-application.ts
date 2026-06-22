@@ -7,6 +7,7 @@ import {
 } from "@miku/db";
 import { Injectable } from "@nestjs/common";
 import { ResourceNotFoundError } from "../../../../core/errors/errors/resource-not-found-error";
+import { ChangePublisher } from "../events/change-publisher";
 import { ApplicationsRepository } from "../repositories/applications-repository";
 
 interface MoveApplicationUseCaseRequest {
@@ -25,7 +26,10 @@ type MoveApplicationUseCaseResponse = Result<
 
 @Injectable()
 export class MoveApplicationUseCase {
-	constructor(private applicationsRepository: ApplicationsRepository) {}
+	constructor(
+		private applicationsRepository: ApplicationsRepository,
+		private changePublisher: ChangePublisher,
+	) {}
 
 	async execute({
 		applicationId,
@@ -50,6 +54,12 @@ export class MoveApplicationUseCase {
 		);
 
 		await this.applicationsRepository.save(application);
+		this.changePublisher.publish({
+			type: "application.moved",
+			id: application.id,
+			x: application.position.x,
+			y: application.position.y,
+		});
 
 		return success({
 			application,
