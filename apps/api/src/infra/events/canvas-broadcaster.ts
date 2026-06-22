@@ -28,11 +28,26 @@ export class CanvasBroadcaster implements OnModuleInit {
 
 	private dispatch(event: ChangeEvent): void {
 		for (const client of this.clients) {
-			const sent =
-				event.type === "application.moved"
-					? client.moved({ id: event.id, x: event.x, y: event.y })
-					: client.changed();
-			sent.catch(() => {});
+			this.push(client, event).catch(() => {});
+		}
+	}
+
+	private push(
+		client: Driver<CanvasListener>,
+		event: ChangeEvent,
+	): Promise<void> {
+		switch (event.type) {
+			case "application.moved":
+				return client.moved({ id: event.id, x: event.x, y: event.y });
+			case "application.created":
+			case "server.changed":
+				return client.changed();
+			default: {
+				// exhaustiveness guard: a new ChangeEvent variant won't compile until
+				// it decides how it reaches connected dashboards
+				const _exhaustive: never = event;
+				return Promise.resolve(_exhaustive);
+			}
 		}
 	}
 }

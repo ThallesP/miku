@@ -7,7 +7,6 @@ import {
 	success,
 } from "@miku/db";
 import { Injectable } from "@nestjs/common";
-import { ChangePublisher } from "../events/change-publisher";
 import { ApplicationsRepository } from "../repositories/applications-repository";
 
 interface CreateApplicationUseCaseRequest {
@@ -25,10 +24,7 @@ type CreateApplicationUseCaseResponse = Result<
 
 @Injectable()
 export class CreateApplicationUseCase {
-	constructor(
-		private applicationsRepository: ApplicationsRepository,
-		private changePublisher: ChangePublisher,
-	) {}
+	constructor(private applicationsRepository: ApplicationsRepository) {}
 
 	async execute({
 		name,
@@ -41,10 +37,11 @@ export class CreateApplicationUseCase {
 			return failure(result.value);
 		}
 
+		// Application.create() records "application.created"; the afterFlush
+		// subscriber publishes it once create() commits
 		const application = result.value;
 
 		await this.applicationsRepository.create(application);
-		this.changePublisher.publish({ type: "application.created" });
 
 		return success({
 			application,

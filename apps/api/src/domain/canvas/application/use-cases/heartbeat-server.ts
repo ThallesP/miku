@@ -33,6 +33,9 @@ export class HeartbeatServerUseCase {
 
 		server.lastSeenAt = new Date();
 		await this.serversRepository.save(server);
+		// a heartbeat is telemetry, not an aggregate state transition worth
+		// modelling as a domain event — so publish the refetch ping app-layer
+		// rather than authoring it on the Server entity
 		this.changePublisher.publish({ type: "server.changed" });
 
 		return success({
