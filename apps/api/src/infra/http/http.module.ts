@@ -14,25 +14,23 @@ import { HttpWorkerProvisioner } from "../discovery/http-worker-provisioner";
 import { TailscaleWorkerDiscovery } from "../discovery/tailscale-worker-discovery";
 import { EventsModule } from "../events/events.module";
 import { ApproveWorkerController } from "./controllers/approve-worker.controller";
-import { ChangeEventsController } from "./controllers/change-events.controller";
+import { CanvasController } from "./controllers/canvas.controller";
 import { CreateApplicationController } from "./controllers/create-application.controller";
 import { DiscoverWorkersController } from "./controllers/discover-workers.controller";
 import { FetchApplicationsController } from "./controllers/fetch-applications.controller";
 import { FetchServersController } from "./controllers/fetch-servers.controller";
 import { HeartbeatServerController } from "./controllers/heartbeat-server.controller";
-import { MoveApplicationController } from "./controllers/move-application.controller";
 
 @Module({
 	imports: [DatabaseModule, EventsModule],
 	controllers: [
 		CreateApplicationController,
 		FetchApplicationsController,
-		MoveApplicationController,
 		FetchServersController,
 		DiscoverWorkersController,
 		ApproveWorkerController,
 		HeartbeatServerController,
-		ChangeEventsController,
+		CanvasController,
 	],
 	providers: [
 		CreateApplicationUseCase,

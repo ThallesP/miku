@@ -7,12 +7,10 @@ import {
 } from "@miku/db";
 import { Injectable } from "@nestjs/common";
 import { ResourceNotFoundError } from "../../../../core/errors/errors/resource-not-found-error";
-import { ChangePublisher } from "../events/change-publisher";
 import { ApplicationsRepository } from "../repositories/applications-repository";
 
 interface MoveApplicationUseCaseRequest {
 	applicationId: string;
-	name?: string;
 	x?: number;
 	y?: number;
 }
@@ -26,14 +24,10 @@ type MoveApplicationUseCaseResponse = Result<
 
 @Injectable()
 export class MoveApplicationUseCase {
-	constructor(
-		private applicationsRepository: ApplicationsRepository,
-		private changePublisher: ChangePublisher,
-	) {}
+	constructor(private applicationsRepository: ApplicationsRepository) {}
 
 	async execute({
 		applicationId,
-		name,
 		x,
 		y,
 	}: MoveApplicationUseCaseRequest): Promise<MoveApplicationUseCaseResponse> {
@@ -44,17 +38,14 @@ export class MoveApplicationUseCase {
 			return failure(new ResourceNotFoundError());
 		}
 
-		if (name !== undefined) {
-			application.name = name;
-		}
-
+		// the setter records "application.moved"; the afterFlush subscriber
+		// publishes it once save() commits
 		application.position = new Position(
 			x ?? application.position.x,
 			y ?? application.position.y,
 		);
 
 		await this.applicationsRepository.save(application);
-		this.changePublisher.publish({ type: "applications" });
 
 		return success({
 			application,

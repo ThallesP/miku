@@ -7,10 +7,17 @@ import { Application } from "./entities/application";
 import { Position } from "./entities/position";
 import { Server } from "./entities/server";
 
+export { AggregateRoot } from "./entities/aggregate-root";
 export { Application } from "./entities/application";
 export { Position } from "./entities/position";
 export { Server } from "./entities/server";
 export { InvalidNameError } from "./errors/invalid-name-error";
+export {
+	ApplicationCreated,
+	ApplicationMoved,
+	DomainEvent,
+	ServerChanged,
+} from "./events";
 export {
 	Failure,
 	failure,
