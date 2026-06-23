@@ -27,7 +27,10 @@ export async function connect(
     connect.Header,
     connect.Provider,
     connect.Listener
-  > = new WebSocketConnector(connection.headers ?? ({} as any), provider);
+  > = new WebSocketConnector(
+    connection.headers ?? ({} as connect.Header),
+    provider,
+  );
   await connector.connect(url);
   const driver: Driver<connect.Listener> = connector.getDriver();
   return {

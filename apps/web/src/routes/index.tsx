@@ -101,20 +101,32 @@ function Dashboard() {
 
 		// realtime canvas: the server pushes other people's moves (so we update
 		// that node live) and a "changed" ping for everything else (so we refetch)
-		const pending = apiClient.connectCanvas({
-			moved: ({ id, x, y }) =>
-				setApplications((prev) =>
-					prev.map((app) => (app.id === id ? { ...app, x, y } : app)),
-				),
-			changed: () => refresh(),
-		});
-		pending.then((canvas) => {
-			canvasRef.current = canvas;
-		});
+		let cancelled = false;
+		apiClient
+			.connectCanvas({
+				moved: ({ id, x, y }) =>
+					setApplications((prev) =>
+						prev.map((app) => (app.id === id ? { ...app, x, y } : app)),
+					),
+				changed: () => refresh(),
+			})
+			.then((canvas) => {
+				// unmounted before the handshake finished (Strict Mode, quick
+				// remount): close immediately instead of leaking a stale socket
+				if (cancelled) {
+					canvas.connector.close();
+					return;
+				}
+				canvasRef.current = canvas;
+			})
+			.catch(() => {
+				// connect rejected (auth/network) — nothing to store or close
+			});
 
 		return () => {
+			cancelled = true;
+			canvasRef.current?.connector.close();
 			canvasRef.current = null;
-			pending.then((canvas) => canvas.connector.close());
 		};
 	}, [refresh]);
 

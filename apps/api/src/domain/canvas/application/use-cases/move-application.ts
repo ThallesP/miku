@@ -11,7 +11,6 @@ import { ApplicationsRepository } from "../repositories/applications-repository"
 
 interface MoveApplicationUseCaseRequest {
 	applicationId: string;
-	name?: string;
 	x?: number;
 	y?: number;
 }
@@ -29,7 +28,6 @@ export class MoveApplicationUseCase {
 
 	async execute({
 		applicationId,
-		name,
 		x,
 		y,
 	}: MoveApplicationUseCaseRequest): Promise<MoveApplicationUseCaseResponse> {
@@ -38,10 +36,6 @@ export class MoveApplicationUseCase {
 
 		if (!application) {
 			return failure(new ResourceNotFoundError());
-		}
-
-		if (name !== undefined) {
-			application.name = name;
 		}
 
 		// the setter records "application.moved"; the afterFlush subscriber

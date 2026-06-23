@@ -45,8 +45,13 @@ export class CanvasController {
 		});
 
 		const leave = this.broadcaster.join(client);
-		await acceptor.join(); // resolves when the dashboard disconnects
-		leave();
+		try {
+			await acceptor.join(); // resolves when the dashboard disconnects
+		} finally {
+			// always unregister, even if join() rejects, so the broadcaster never
+			// fans out to a dead driver
+			leave();
+		}
 	}
 
 	private async authenticated(
