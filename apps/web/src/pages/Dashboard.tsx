@@ -1,4 +1,4 @@
-import { api, type Doc, type Id } from "@miku/backend";
+import { api, type DeploymentStatus, type Doc, type Id } from "@miku/backend";
 import {
 	Background,
 	BackgroundVariant,
@@ -26,7 +26,8 @@ import {
 
 const ONLINE_THRESHOLD_MS = 15_000;
 
-type DeploymentStatus = Doc<"deployments">["status"];
+// the deployments queries return each row with its derived status stamped on
+type Deployment = Doc<"deployments"> & { status: DeploymentStatus };
 
 type AppNodeData = {
 	id: Id<"apps">;
@@ -34,6 +35,7 @@ type AppNodeData = {
 	x: number;
 	y: number;
 	status?: DeploymentStatus;
+	durationMs?: number;
 } & Record<string, unknown>;
 
 type ServerNodeData = {
@@ -55,7 +57,7 @@ const nodeTypes = {
 function buildNodes(
 	apps: Doc<"apps">[],
 	servers: Doc<"servers">[],
-	statusByApp: Map<string, DeploymentStatus>,
+	latestByApp: Map<string, Deployment>,
 ): CanvasNode[] {
 	return [
 		...servers.map(
@@ -73,21 +75,25 @@ function buildNodes(
 					},
 				}) satisfies CanvasNode,
 		),
-		...apps.map(
-			(app) =>
-				({
-					id: `app-${app._id}`,
-					type: "application",
-					position: { x: app.x, y: app.y },
-					data: {
-						id: app._id,
-						name: app.name,
-						x: app.x,
-						y: app.y,
-						status: statusByApp.get(app._id),
-					},
-				}) satisfies CanvasNode,
-		),
+		...apps.map((app): CanvasNode => {
+			const latest = latestByApp.get(app._id);
+			return {
+				id: `app-${app._id}`,
+				type: "application",
+				position: { x: app.x, y: app.y },
+				data: {
+					id: app._id,
+					name: app.name,
+					x: app.x,
+					y: app.y,
+					status: latest?.status,
+					durationMs:
+						latest?.runningAt !== undefined
+							? latest.runningAt - latest._creationTime
+							: undefined,
+				},
+			};
+		}),
 	];
 }
 
@@ -118,17 +124,16 @@ export function Dashboard() {
 	const lastMoveRef = useRef(0);
 
 	// latest deployment status per app, for the badge on each application node
-	const statusByApp = useMemo(() => {
-		const status = new Map<string, DeploymentStatus>();
-		const latestAt = new Map<string, number>();
+	// latest deployment per app (by creation time) → status + duration badge
+	const latestByApp = useMemo(() => {
+		const latest = new Map<string, Deployment>();
 		for (const deployment of deployments) {
-			const seen = latestAt.get(deployment.appId);
-			if (seen === undefined || deployment.updatedAt > seen) {
-				latestAt.set(deployment.appId, deployment.updatedAt);
-				status.set(deployment.appId, deployment.status);
+			const seen = latest.get(deployment.appId);
+			if (!seen || deployment._creationTime > seen._creationTime) {
+				latest.set(deployment.appId, deployment);
 			}
 		}
-		return status;
+		return latest;
 	}, [deployments]);
 
 	// rebuild the graph whenever reactive data changes — except mid-drag, so we
@@ -138,8 +143,8 @@ export function Dashboard() {
 		if (draggingRef.current) {
 			return;
 		}
-		setNodes(buildNodes(apps, servers, statusByApp));
-	}, [apps, servers, statusByApp, setNodes]);
+		setNodes(buildNodes(apps, servers, latestByApp));
+	}, [apps, servers, latestByApp, setNodes]);
 
 	const sendMove = useCallback(
 		(id: Id<"apps">, x: number, y: number, force = false) => {
@@ -335,9 +340,14 @@ function ApplicationNode({
 			</p>
 			{data.status ? (
 				<span
-					className={`mt-2 inline-block rounded px-1.5 py-0.5 font-medium text-xs ${STATUS_STYLES[data.status]}`}
+					className={`mt-2 inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-medium text-xs ${STATUS_STYLES[data.status]}`}
 				>
 					{data.status}
+					{data.durationMs !== undefined ? (
+						<span className="opacity-70">
+							· {(data.durationMs / 1000).toFixed(1)}s
+						</span>
+					) : null}
 				</span>
 			) : null}
 		</div>

@@ -4,3 +4,9 @@
 // before any typecheck) emits ./convex/_generated.
 export { api } from "./convex/_generated/api.js";
 export type { Doc, Id } from "./convex/_generated/dataModel";
+// Derived deployment status lives here too, so the backend and the web compute it
+// the same way — the Convex analogue of a shared entity getter.
+export {
+	type DeploymentStatus,
+	deploymentStatus,
+} from "./convex/lib/deployments";

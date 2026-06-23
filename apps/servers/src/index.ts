@@ -1,6 +1,6 @@
 import os from "node:os";
 
-import { api, type Doc } from "@miku/backend";
+import { api, type DeploymentStatus, type Doc } from "@miku/backend";
 import { joinNetwork } from "@miku/network";
 import * as restate from "@restatedev/restate-sdk";
 import * as clients from "@restatedev/restate-sdk-clients";
@@ -20,12 +20,8 @@ const serviceUrl =
 	`http://host.docker.internal:${restatePort}`;
 const convexUrl = process.env.CONVEX_URL ?? "http://localhost:3210";
 
-type DeploymentStatusUpdate = {
-	id: Doc<"deployments">["_id"];
-	status: Doc<"deployments">["status"];
-	containerId?: string;
-	message?: string;
-};
+// the forServer query returns each row with its derived status stamped on
+type Deployment = Doc<"deployments"> & { status: DeploymentStatus };
 
 // 1. Join the tailnet. Tailscale stays purely server-side; nothing reaches back in.
 const identity = await joinNetwork(serverName, {
@@ -65,7 +61,7 @@ convex.onUpdate(api.deployments.forServer, { serverId }, (deployments) => {
 	}
 });
 
-async function reconcile(deployment: Doc<"deployments">): Promise<void> {
+async function reconcile(deployment: Deployment): Promise<void> {
 	if (inflight.has(deployment._id)) {
 		return;
 	}
@@ -85,9 +81,8 @@ async function reconcile(deployment: Doc<"deployments">): Promise<void> {
 	inflight.add(deployment._id);
 	try {
 		if (wantsRun) {
-			await updateDeploymentStatus({
+			await convex.mutation(api.deployments.markPulling, {
 				id: deployment._id,
-				status: "pulling",
 			});
 
 			try {
@@ -101,17 +96,19 @@ async function reconcile(deployment: Doc<"deployments">): Promise<void> {
 					clients.rpc.opts({ idempotencyKey: deployment._id }),
 				);
 
-				await tryReportDeploymentStatus({
-					id: deployment._id,
-					status: "running",
-					containerId,
-				});
+				await report(() =>
+					convex.mutation(api.deployments.markRunning, {
+						id: deployment._id,
+						containerId,
+					}),
+				);
 			} catch (error) {
-				await tryReportDeploymentStatus({
-					id: deployment._id,
-					status: "failed",
-					message: errorMessage(error),
-				});
+				await report(() =>
+					convex.mutation(api.deployments.markFailed, {
+						id: deployment._id,
+						message: errorMessage(error),
+					}),
+				);
 			}
 		} else {
 			try {
@@ -120,16 +117,18 @@ async function reconcile(deployment: Doc<"deployments">): Promise<void> {
 					clients.rpc.opts({ idempotencyKey: `${deployment._id}:stop` }),
 				);
 
-				await tryReportDeploymentStatus({
-					id: deployment._id,
-					status: "stopped",
-				});
+				await report(() =>
+					convex.mutation(api.deployments.markStopped, {
+						id: deployment._id,
+					}),
+				);
 			} catch (error) {
-				await tryReportDeploymentStatus({
-					id: deployment._id,
-					status: "failed",
-					message: errorMessage(error),
-				});
+				await report(() =>
+					convex.mutation(api.deployments.markFailed, {
+						id: deployment._id,
+						message: errorMessage(error),
+					}),
+				);
 			}
 		}
 	} catch (error) {
@@ -142,18 +141,13 @@ async function reconcile(deployment: Doc<"deployments">): Promise<void> {
 	}
 }
 
-function updateDeploymentStatus(update: DeploymentStatusUpdate) {
-	return convex.mutation(api.deployments.updateStatus, update);
-}
-
-async function tryReportDeploymentStatus(update: DeploymentStatusUpdate) {
+// status reports are best-effort: a failed report must not be mistaken for a
+// failed deploy (the deploy already happened), so we swallow + log.
+async function report(op: () => Promise<unknown>) {
 	try {
-		await updateDeploymentStatus(update);
+		await op();
 	} catch (error) {
-		console.warn(
-			`[server] could not report deployment ${update.id} as ${update.status}`,
-			error,
-		);
+		console.warn("[server] could not report deployment status", error);
 	}
 }
 

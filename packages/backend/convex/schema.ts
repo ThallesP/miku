@@ -33,16 +33,16 @@ export default defineSchema({
 		env: v.optional(v.record(v.string(), v.string())),
 		ports: v.optional(v.array(v.string())),
 		desiredState: v.union(v.literal("running"), v.literal("stopped")),
-		status: v.union(
-			v.literal("pending"),
-			v.literal("pulling"),
-			v.literal("running"),
-			v.literal("failed"),
-			v.literal("stopped"),
-		),
+		// Lifecycle timestamps — `status` is *derived* from which of these are set
+		// (see lib/deployments.ts), the Convex stand-in for a computed getter. The
+		// row's _creationTime is the "created" stamp; runningAt - _creationTime is
+		// the deploy duration.
+		pullingAt: v.optional(v.number()),
+		runningAt: v.optional(v.number()),
+		failedAt: v.optional(v.number()),
+		stoppedAt: v.optional(v.number()),
 		containerId: v.optional(v.string()),
 		message: v.optional(v.string()),
-		updatedAt: v.number(),
 	})
 		.index("by_server", ["serverId"])
 		.index("by_app", ["appId"]),
