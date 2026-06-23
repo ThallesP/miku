@@ -2,19 +2,25 @@
 	"name": "servers",
 	"private": true,
 	"type": "module",
+	"engines": {
+		"node": ">=24"
+	},
 	"scripts": {
-		"dev": "bun --watch src/index.ts",
-		"start": "bun src/index.ts",
+		"dev": "node --watch --disable-warning=ExperimentalWarning src/index.ts",
+		"start": "node --disable-warning=ExperimentalWarning src/index.ts",
 		"check": "tsc --noEmit",
 		"lint": "biome lint --config-path ../../biome.json .",
 		"format": "biome format --config-path ../../biome.json ."
 	},
 	"dependencies": {
+		"@docker/node-sdk": "^0.0.17",
 		"@miku/backend": "workspace:*",
 		"@miku/network": "workspace:*",
 		"@restatedev/restate-sdk": "^1.15.0",
 		"@restatedev/restate-sdk-clients": "^1.15.0",
-		"convex": "^1.40.0"
+		"@t3-oss/env-core": "^0.13.11",
+		"convex": "^1.40.0",
+		"zod": "^4.4.3"
 	},
 	"devDependencies": {
 		"@types/node": "^22.10.2",

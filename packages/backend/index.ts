@@ -9,4 +9,4 @@ export type { Doc, Id } from "./convex/_generated/dataModel";
 export {
 	type DeploymentStatus,
 	deploymentStatus,
-} from "./convex/lib/deployments";
+} from "./convex/lib/deployments.ts";

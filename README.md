@@ -10,7 +10,7 @@ together by Convex's reactive queries, so the canvas updates live with no WebSoc
 | --- | --- |
 | `packages/backend` | The control plane: a self-hosted [Convex](https://convex.dev) deployment (`convex/schema.ts` + `convex/{apps,servers,deployments}.ts`). One reactive datastore + typed functions; the generated `convex/_generated` is the shared contract imported by web and servers. |
 | `apps/web` | Dashboard. Vite + React + [React Router](https://reactrouter.com) + a [React Flow](https://reactflow.dev) canvas. Reads/writes through `convex/react` hooks (`useQuery`/`useMutation`) — reactivity replaces the old WebSocket/SSE layer. |
-| `apps/servers` | Server process. Joins the network (Tailscale, with a local fallback), self-registers with Convex, heartbeats, subscribes to its deployments, and runs each via a local [Restate](https://restate.dev) durable workflow (`docker pull` → `docker run`). |
+| `apps/servers` | Server process (Node ≥24). Joins the network (Tailscale, with a local fallback), self-registers with Convex, heartbeats, subscribes to its deployments, and runs each via a local [Restate](https://restate.dev) durable workflow that drives the Docker Engine API through [`@docker/node-sdk`](https://www.npmjs.com/package/@docker/node-sdk). |
 | `packages/network` | `joinNetwork` — `tailscale up` with a LAN fallback. |
 
 ## Architecture
@@ -53,9 +53,13 @@ bun --cwd apps/servers start
 TS_AUTHKEY=tskey-auth-... SERVER_NAME=server-1 bun --cwd apps/servers start
 ```
 
-Server env (all optional; defaults shown): `CONVEX_URL=http://localhost:3210`,
+The server runs on **Node ≥24** (the `start` script runs the TypeScript directly via Node's type
+stripping). It needs access to the Docker socket — the [`@docker/node-sdk`](https://www.npmjs.com/package/@docker/node-sdk)
+client talks to the Docker Engine API. Env (`apps/servers/src/env.ts`, all optional, defaults
+shown): `CONVEX_URL=http://localhost:3210`, `DOCKER_HOST=unix:/var/run/docker.sock`,
 `RESTATE_INGRESS_URL=http://localhost:8080`, `RESTATE_ADMIN_URL=http://localhost:9070`,
-`RESTATE_SERVICE_URL=http://host.docker.internal:9080`, `RESTATE_PORT=9080`.
+`RESTATE_SERVICE_URL=http://host.docker.internal:9080`, `RESTATE_PORT=9080`,
+`SERVER_NAME=<hostname>`.
 
 ## Convex
 
