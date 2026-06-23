@@ -1,39 +1,18 @@
-import { api, type DeploymentStatus, type Doc } from "@miku/backend";
 import type { NetworkIdentity } from "@miku/network";
-import * as clients from "@restatedev/restate-sdk-clients";
-import { ConvexClient } from "convex/browser";
 
-import { connectDeployer } from "./deployer.ts";
-import { env } from "./env.ts";
+import { api, convex } from "./convex.ts";
+import { deploymentObject } from "./deployment.ts";
+import { connectIngress } from "./restate.ts";
+import { serverObject } from "./server.ts";
 
-// the forServer query stamps the derived status onto each row
-type Deployment = Doc<"deployments"> & { status: DeploymentStatus };
-
-// Desired vs current (derived) state → the one action this row needs, if any.
-// "pulling" is re-picked so a deploy interrupted by a crash resumes; Restate's
-// idempotency key collapses the re-invocation onto the same execution.
-function nextAction(d: Deployment): "run" | "stop" | null {
-	if (
-		d.desiredState === "running" &&
-		(d.status === "pending" || d.status === "pulling")
-	) {
-		return "run";
-	}
-	if (d.desiredState === "stopped" && d.status !== "stopped") {
-		return "stop";
-	}
-	return null;
-}
-
-// Find the control plane, self-register, and reconcile our own deployments by
-// driving our OWN local Restate ingress (localhost). Nothing reaches into the
-// tailnet — the server only ever calls out.
+// Find the control plane, self-register, then pump desired-state changes into our
+// own Restate objects. This is pure glue: no decisions, no in-memory dedup, no status
+// reporting — all of that now lives durably in the deployment object. Nothing reaches
+// into the tailnet; the server only ever calls out.
 export async function startControlPlane(
 	identity: NetworkIdentity,
 ): Promise<void> {
-	const convex = new ConvexClient(env.CONVEX_URL);
-	const deployer = connectDeployer();
-	const inflight = new Set<string>();
+	const ingress = connectIngress();
 
 	const serverId = await convex.mutation(api.servers.register, {
 		name: identity.name,
@@ -42,74 +21,40 @@ export async function startControlPlane(
 	});
 	console.log(`[server] registered with control plane as ${serverId}`);
 
-	setInterval(() => {
-		void convex.mutation(api.servers.heartbeat, { serverId }).catch(() => {});
-	}, 5000);
+	// Start the durable heartbeat; the server object re-arms its own beat thereafter,
+	// and `start` retires any chain left over from a previous boot.
+	ingress
+		.objectSendClient(serverObject, serverId)
+		.start()
+		.catch((error) =>
+			console.warn("[server] could not start heartbeat", error),
+		);
 
+	// Convex is just a durable change feed here: forward each desired-state change
+	// into the deployment's object, which serializes and does the actual work. The
+	// `lastDesired` map only trims chatter (Convex re-pushes the whole array on any
+	// change) — correctness comes from the object's no-op + single-writer guarantee.
+	const lastDesired = new Map<string, string>();
 	convex.onUpdate(api.deployments.forServer, { serverId }, (deployments) => {
 		for (const deployment of deployments) {
-			void reconcile(deployment);
+			const id = deployment._id;
+			if (lastDesired.get(id) === deployment.desiredState) {
+				continue;
+			}
+			lastDesired.set(id, deployment.desiredState);
+			ingress
+				.objectSendClient(deploymentObject, id)
+				.reconcile({
+					desiredState: deployment.desiredState,
+					image: deployment.image,
+					env: deployment.env,
+					ports: deployment.ports,
+				})
+				.catch((error) => {
+					// let the next update retry this row
+					lastDesired.delete(id);
+					console.warn("[server] could not enqueue reconcile", error);
+				});
 		}
 	});
-
-	async function reconcile(deployment: Deployment): Promise<void> {
-		const action = nextAction(deployment);
-		if (!action || inflight.has(deployment._id)) {
-			return;
-		}
-
-		const id = deployment._id;
-		inflight.add(id);
-		try {
-			if (action === "run") {
-				await report(() =>
-					convex.mutation(api.deployments.markPulling, { id }),
-				);
-				const containerId = await deployer.run(
-					{
-						name: id,
-						image: deployment.image,
-						env: deployment.env,
-						ports: deployment.ports,
-					},
-					clients.rpc.opts({ idempotencyKey: id }),
-				);
-				await report(() =>
-					convex.mutation(api.deployments.markRunning, { id, containerId }),
-				);
-			} else {
-				await deployer.stop(
-					{ name: id },
-					clients.rpc.opts({ idempotencyKey: `${id}:stop` }),
-				);
-				await report(() =>
-					convex.mutation(api.deployments.markStopped, { id }),
-				);
-			}
-		} catch (error) {
-			// the durable workflow itself failed — surface it as `failed`
-			await report(() =>
-				convex.mutation(api.deployments.markFailed, {
-					id,
-					message: errorMessage(error),
-				}),
-			);
-		} finally {
-			inflight.delete(id);
-		}
-	}
-}
-
-// Status reports are best-effort: the deploy already happened, so a failed report
-// must not be mistaken for a failed deploy.
-async function report(op: () => Promise<unknown>): Promise<void> {
-	try {
-		await op();
-	} catch (error) {
-		console.warn("[server] could not report deployment status", error);
-	}
-}
-
-function errorMessage(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
 }

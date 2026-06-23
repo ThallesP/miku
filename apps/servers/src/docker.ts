@@ -1,4 +1,5 @@
 import { DockerClient } from "@docker/node-sdk";
+import * as restate from "@restatedev/restate-sdk";
 
 import { env } from "./env.ts";
 
@@ -50,7 +51,10 @@ export async function runContainer(spec: ContainerSpec): Promise<string> {
 	const { State } = await docker.containerInspect(Id);
 	if (State?.Status !== "running") {
 		await removeContainer(spec.name);
-		throw new Error(
+		// A container that refuses to start (bad entrypoint, port already taken) won't
+		// start on a retry either — fail fast with a TerminalError so the durable step
+		// surfaces it as `failed` instead of burning every retry attempt.
+		throw new restate.TerminalError(
 			State?.Error ||
 				`container did not start (status: ${State?.Status}, exit: ${State?.ExitCode})`,
 		);
