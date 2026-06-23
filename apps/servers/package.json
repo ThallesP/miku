@@ -1,5 +1,5 @@
 {
-	"name": "workers",
+	"name": "servers",
 	"private": true,
 	"type": "module",
 	"scripts": {

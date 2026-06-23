@@ -8,12 +8,12 @@ import { ConvexClient } from "convex/browser";
 
 import { deployer } from "./deployer.ts";
 
-const workerName = process.env.WORKER_NAME ?? os.hostname();
+const serverName = process.env.SERVER_NAME ?? os.hostname();
 const restatePort = Number(process.env.RESTATE_PORT ?? 9080);
 const restateIngress =
 	process.env.RESTATE_INGRESS_URL ?? "http://localhost:8080";
 const restateAdmin = process.env.RESTATE_ADMIN_URL ?? "http://localhost:9070";
-// how the Restate server (running in Docker) reaches this worker's service, which
+// how the Restate server (running in Docker) reaches this server's service, which
 // listens on the host — host.docker.internal bridges container → host
 const serviceUrl =
 	process.env.RESTATE_SERVICE_URL ??
@@ -27,9 +27,9 @@ type DeploymentStatusUpdate = {
 	message?: string;
 };
 
-// 1. Join the tailnet. Tailscale stays purely worker-side; nothing reaches back in.
-const identity = await joinNetwork(workerName, {
-	advertiseTags: ["tag:miku-worker"],
+// 1. Join the tailnet. Tailscale stays purely server-side; nothing reaches back in.
+const identity = await joinNetwork(serverName, {
+	advertiseTags: ["tag:miku-server"],
 });
 
 // 2. Serve our local, durable deploy workflow and tell the Restate server about it.
@@ -40,16 +40,16 @@ await registerWithRestate();
 // 3. Find the control plane and self-register. Public mutation, no auth in v1 —
 //    this single call replaces the old discover → approve → push-provision flow.
 const convex = new ConvexClient(convexUrl);
-const workerId = await convex.mutation(api.workers.register, {
+const serverId = await convex.mutation(api.servers.register, {
 	name: identity.name,
 	address: identity.address,
 	network: identity.network,
 });
-console.log(`[worker] registered with control plane as ${workerId}`);
+console.log(`[server] registered with control plane as ${serverId}`);
 
 // 4. Heartbeat liveness.
 setInterval(() => {
-	void convex.mutation(api.workers.heartbeat, { workerId }).catch(() => {});
+	void convex.mutation(api.servers.heartbeat, { serverId }).catch(() => {});
 }, 5000);
 
 // 5. Pull trigger: subscribe to the deployments assigned to us and reconcile each
@@ -59,7 +59,7 @@ const restateClient = clients.connect({ url: restateIngress });
 const deployerClient = restateClient.serviceClient(deployer);
 const inflight = new Set<string>();
 
-convex.onUpdate(api.deployments.forWorker, { workerId }, (deployments) => {
+convex.onUpdate(api.deployments.forServer, { serverId }, (deployments) => {
 	for (const deployment of deployments) {
 		void reconcile(deployment);
 	}
@@ -134,7 +134,7 @@ async function reconcile(deployment: Doc<"deployments">): Promise<void> {
 		}
 	} catch (error) {
 		console.warn(
-			`[worker] could not reconcile deployment ${deployment._id}`,
+			`[server] could not reconcile deployment ${deployment._id}`,
 			error,
 		);
 	} finally {
@@ -151,7 +151,7 @@ async function tryReportDeploymentStatus(update: DeploymentStatusUpdate) {
 		await updateDeploymentStatus(update);
 	} catch (error) {
 		console.warn(
-			`[worker] could not report deployment ${update.id} as ${update.status}`,
+			`[server] could not report deployment ${update.id} as ${update.status}`,
 			error,
 		);
 	}

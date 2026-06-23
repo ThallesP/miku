@@ -12,7 +12,7 @@ export type NetworkIdentity = {
 
 export interface JoinNetworkOptions {
 	/**
-	 * Tags to advertise on `tailscale up`, e.g. ["tag:miku-worker"]. The auth
+	 * Tags to advertise on `tailscale up`, e.g. ["tag:miku-server"]. The auth
 	 * key must be authorized for these tags in the tailnet ACL (tagOwners).
 	 */
 	advertiseTags?: string[];
@@ -20,7 +20,7 @@ export interface JoinNetworkOptions {
 
 /**
  * Join the mesh network. With TS_AUTHKEY set (and tailscaled running),
- * the worker joins the tailnet under its own hostname. Without it we
+ * the server joins the tailnet under its own hostname. Without it we
  * fall back to the LAN address so local dev needs zero setup.
  */
 export async function joinNetwork(

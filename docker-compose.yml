@@ -1,5 +1,5 @@
 # Local dev infra. Convex replaces Postgres as the control-plane datastore; Restate
-# is the workers' durable execution server.
+# is the servers' durable execution server.
 #   Start with: docker compose up -d --wait
 #   Admin key:  bun run convex:admin-key   (paste into packages/backend/.env.local)
 services:
@@ -37,7 +37,7 @@ services:
         condition: service_healthy
 
   # Restate server. 8080 = ingress (invoke handlers), 9070 = admin (register
-  # deployments). host.docker.internal lets it reach a worker's service on the host.
+  # deployments). host.docker.internal lets it reach a server's service on the host.
   restate:
     image: docker.restate.dev/restatedev/restate:latest
     ports:

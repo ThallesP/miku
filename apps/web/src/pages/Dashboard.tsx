@@ -36,7 +36,7 @@ type AppNodeData = {
 	status?: DeploymentStatus;
 } & Record<string, unknown>;
 
-type WorkerNodeData = {
+type ServerNodeData = {
 	name: string;
 	address: string;
 	network: string;
@@ -45,31 +45,31 @@ type WorkerNodeData = {
 
 type CanvasNode =
 	| Node<AppNodeData, "application">
-	| Node<WorkerNodeData, "worker">;
+	| Node<ServerNodeData, "server">;
 
 const nodeTypes = {
 	application: ApplicationNode,
-	worker: WorkerNode,
+	server: ServerNode,
 } satisfies NodeTypes;
 
 function buildNodes(
 	apps: Doc<"apps">[],
-	workers: Doc<"workers">[],
+	servers: Doc<"servers">[],
 	statusByApp: Map<string, DeploymentStatus>,
 ): CanvasNode[] {
 	return [
-		...workers.map(
-			(worker, index) =>
+		...servers.map(
+			(server, index) =>
 				({
-					id: `worker-${worker._id}`,
-					type: "worker",
+					id: `server-${server._id}`,
+					type: "server",
 					position: { x: -300, y: 40 + index * 130 },
 					draggable: false,
 					data: {
-						name: worker.name,
-						address: worker.address,
-						network: worker.network,
-						lastSeenAt: worker.lastSeenAt,
+						name: server.name,
+						address: server.address,
+						network: server.network,
+						lastSeenAt: server.lastSeenAt,
 					},
 				}) satisfies CanvasNode,
 		),
@@ -93,7 +93,7 @@ function buildNodes(
 
 export function Dashboard() {
 	const apps = useQuery(api.apps.list) ?? [];
-	const workers = useQuery(api.workers.list) ?? [];
+	const servers = useQuery(api.servers.list) ?? [];
 	const deployments = useQuery(api.deployments.list) ?? [];
 
 	const createApp = useMutation(api.apps.create);
@@ -138,8 +138,8 @@ export function Dashboard() {
 		if (draggingRef.current) {
 			return;
 		}
-		setNodes(buildNodes(apps, workers, statusByApp));
-	}, [apps, workers, statusByApp, setNodes]);
+		setNodes(buildNodes(apps, servers, statusByApp));
+	}, [apps, servers, statusByApp, setNodes]);
 
 	const sendMove = useCallback(
 		(id: Id<"apps">, x: number, y: number, force = false) => {
@@ -204,7 +204,7 @@ export function Dashboard() {
 					<Plus className="size-4" />
 					Add application
 				</Button>
-				<DeployPanel apps={apps} workers={workers} />
+				<DeployPanel apps={apps} servers={servers} />
 			</div>
 		</main>
 	);
@@ -212,18 +212,18 @@ export function Dashboard() {
 
 function DeployPanel({
 	apps,
-	workers,
+	servers,
 }: {
 	apps: Doc<"apps">[];
-	workers: Doc<"workers">[];
+	servers: Doc<"servers">[];
 }) {
 	const createDeployment = useMutation(api.deployments.create);
 	const [appId, setAppId] = useState<string>("");
-	const [workerId, setWorkerId] = useState<string>("");
+	const [serverId, setServerId] = useState<string>("");
 	const [image, setImage] = useState("nginx:alpine");
 	const [ports, setPorts] = useState("");
 
-	const canDeploy = appId !== "" && workerId !== "" && image.trim() !== "";
+	const canDeploy = appId !== "" && serverId !== "" && image.trim() !== "";
 
 	async function handleDeploy() {
 		if (!canDeploy) {
@@ -231,7 +231,7 @@ function DeployPanel({
 		}
 		await createDeployment({
 			appId: appId as Id<"apps">,
-			workerId: workerId as Id<"workers">,
+			serverId: serverId as Id<"servers">,
 			image: image.trim(),
 			ports: ports.trim() ? [ports.trim()] : undefined,
 		});
@@ -262,17 +262,17 @@ function DeployPanel({
 				</div>
 
 				<div className="flex flex-col gap-1.5">
-					<Label className="text-xs" htmlFor="deploy-worker">
-						Worker
+					<Label className="text-xs" htmlFor="deploy-server">
+						Server
 					</Label>
-					<Select value={workerId} onValueChange={setWorkerId}>
-						<SelectTrigger className="w-full" id="deploy-worker" size="sm">
-							<SelectValue placeholder="Select worker" />
+					<Select value={serverId} onValueChange={setServerId}>
+						<SelectTrigger className="w-full" id="deploy-server" size="sm">
+							<SelectValue placeholder="Select server" />
 						</SelectTrigger>
 						<SelectContent>
-							{workers.map((worker) => (
-								<SelectItem key={worker._id} value={worker._id}>
-									{worker.name}
+							{servers.map((server) => (
+								<SelectItem key={server._id} value={server._id}>
+									{server.name}
 								</SelectItem>
 							))}
 						</SelectContent>
@@ -344,7 +344,7 @@ function ApplicationNode({
 	);
 }
 
-function WorkerNode({ data }: NodeProps<Node<WorkerNodeData, "worker">>) {
+function ServerNode({ data }: NodeProps<Node<ServerNodeData, "server">>) {
 	const online = useOnline(data.lastSeenAt);
 
 	return (

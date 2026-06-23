@@ -5,12 +5,12 @@ import { mutation, query } from "./_generated/server";
 // `lastSeenAt` against a ticking clock so nodes flip offline without a server write.
 export const list = query({
 	args: {},
-	handler: (ctx) => ctx.db.query("workers").collect(),
+	handler: (ctx) => ctx.db.query("servers").collect(),
 });
 
-// PUBLIC, no auth (v1): a worker finds the control plane over Tailscale and calls
+// PUBLIC, no auth (v1): a server finds the control plane over Tailscale and calls
 // this on boot. Replaces the entire discover → approve → push-provision dance.
-// Idempotent by name so a restarting worker re-attaches instead of duplicating.
+// Idempotent by name so a restarting server re-attaches instead of duplicating.
 export const register = mutation({
 	args: {
 		name: v.string(),
@@ -19,7 +19,7 @@ export const register = mutation({
 	},
 	handler: async (ctx, args) => {
 		const existing = await ctx.db
-			.query("workers")
+			.query("servers")
 			.withIndex("by_name", (q) => q.eq("name", args.name))
 			.unique();
 
@@ -32,12 +32,12 @@ export const register = mutation({
 			return existing._id;
 		}
 
-		return ctx.db.insert("workers", { ...args, lastSeenAt: Date.now() });
+		return ctx.db.insert("servers", { ...args, lastSeenAt: Date.now() });
 	},
 });
 
-// Replaces HeartbeatServerController. The worker patches its own liveness every 5s.
+// Replaces HeartbeatServerController. The server patches its own liveness every 5s.
 export const heartbeat = mutation({
-	args: { workerId: v.id("workers") },
-	handler: (ctx, { workerId }) => ctx.db.patch(workerId, { lastSeenAt: Date.now() }),
+	args: { serverId: v.id("servers") },
+	handler: (ctx, { serverId }) => ctx.db.patch(serverId, { lastSeenAt: Date.now() }),
 });

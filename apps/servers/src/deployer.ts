@@ -6,7 +6,7 @@ import * as restate from "@restatedev/restate-sdk";
 // deploy it resumes from the last completed step, and a re-invocation with the
 // same idempotency key collapses to one execution. Steps are bounded so a real,
 // persistent failure (bad image, port already allocated) surfaces as a thrown
-// error — which the worker reports as `failed` — rather than retrying forever.
+// error — which the server reports as `failed` — rather than retrying forever.
 
 const RETRY: restate.RunOptions<string> = { maxRetryAttempts: 5 };
 

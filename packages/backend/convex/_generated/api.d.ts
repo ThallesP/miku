@@ -10,7 +10,7 @@
 
 import type * as apps from "../apps.js";
 import type * as deployments from "../deployments.js";
-import type * as workers from "../workers.js";
+import type * as servers from "../servers.js";
 
 import type {
   ApiFromModules,
@@ -21,7 +21,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   apps: typeof apps;
   deployments: typeof deployments;
-  workers: typeof workers;
+  servers: typeof servers;
 }>;
 
 /**
