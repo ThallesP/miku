@@ -20,7 +20,7 @@ export default defineSchema({
 	workers: defineTable({
 		name: v.string(),
 		address: v.string(),
-		network: v.string(),
+		network: v.union(v.literal("tailscale"), v.literal("local")),
 		lastSeenAt: v.number(),
 	}).index("by_name", ["name"]),
 

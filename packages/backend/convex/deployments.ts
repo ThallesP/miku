@@ -26,13 +26,27 @@ export const create = mutation({
 		env: v.optional(v.record(v.string(), v.string())),
 		ports: v.optional(v.array(v.string())),
 	},
-	handler: (ctx, args) =>
-		ctx.db.insert("deployments", {
+	handler: async (ctx, args) => {
+		const [app, worker] = await Promise.all([
+			ctx.db.get(args.appId),
+			ctx.db.get(args.workerId),
+		]);
+
+		if (!app) {
+			throw new Error("Application not found");
+		}
+
+		if (!worker) {
+			throw new Error("Worker not found");
+		}
+
+		return ctx.db.insert("deployments", {
 			...args,
 			desiredState: "running",
 			status: "pending",
 			updatedAt: Date.now(),
-		}),
+		});
+	},
 });
 
 // The worker reports observed reality back here as its local Restate workflow runs.

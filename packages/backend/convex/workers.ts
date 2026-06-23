@@ -12,7 +12,11 @@ export const list = query({
 // this on boot. Replaces the entire discover → approve → push-provision dance.
 // Idempotent by name so a restarting worker re-attaches instead of duplicating.
 export const register = mutation({
-	args: { name: v.string(), address: v.string(), network: v.string() },
+	args: {
+		name: v.string(),
+		address: v.string(),
+		network: v.union(v.literal("tailscale"), v.literal("local")),
+	},
 	handler: async (ctx, args) => {
 		const existing = await ctx.db
 			.query("workers")

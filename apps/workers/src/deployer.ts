@@ -36,6 +36,35 @@ function docker(args: string[]): Promise<string> {
 	});
 }
 
+async function runContainer(
+	input: DeployInput,
+	portArgs: string[],
+	envArgs: string[],
+) {
+	try {
+		return await docker([
+			"run",
+			"-d",
+			"--name",
+			input.name,
+			...portArgs,
+			...envArgs,
+			input.image,
+		]);
+	} catch (error) {
+		if (!isNameConflict(error)) {
+			throw error;
+		}
+
+		return docker(["inspect", "--format", "{{.Id}}", input.name]);
+	}
+}
+
+function isNameConflict(error: unknown) {
+	const message = error instanceof Error ? error.message.toLowerCase() : "";
+	return message.includes("conflict") && message.includes("already in use");
+}
+
 export const deployer = restate.service({
 	name: "deployer",
 	handlers: {
@@ -45,8 +74,9 @@ export const deployer = restate.service({
 		): Promise<{ containerId: string }> => {
 			await ctx.run("docker pull", () => docker(["pull", input.image]));
 
-			// drop any previous container with this name so a replayed/retried run
-			// (or a redeploy) is idempotent rather than colliding on the name
+			// Drop any previous container before a fresh run; runContainer also
+			// handles a replay after Docker created the container but before Restate
+			// journaled the step result.
 			await ctx.run("docker rm", () =>
 				docker(["rm", "-f", input.name]).catch(() => ""),
 			);
@@ -58,15 +88,7 @@ export const deployer = restate.service({
 			]);
 
 			const containerId = await ctx.run("docker run", () =>
-				docker([
-					"run",
-					"-d",
-					"--name",
-					input.name,
-					...portArgs,
-					...envArgs,
-					input.image,
-				]),
+				runContainer(input, portArgs, envArgs),
 			);
 
 			return { containerId };

@@ -20,6 +20,13 @@ const serviceUrl =
 	`http://host.docker.internal:${restatePort}`;
 const convexUrl = process.env.CONVEX_URL ?? "http://localhost:3210";
 
+type DeploymentStatusUpdate = {
+	id: Doc<"deployments">["_id"];
+	status: Doc<"deployments">["status"];
+	containerId?: string;
+	message?: string;
+};
+
 // 1. Join the tailnet. Tailscale stays purely worker-side; nothing reaches back in.
 const identity = await joinNetwork(workerName, {
 	advertiseTags: ["tag:miku-worker"],
@@ -78,46 +85,80 @@ async function reconcile(deployment: Doc<"deployments">): Promise<void> {
 	inflight.add(deployment._id);
 	try {
 		if (wantsRun) {
-			await convex.mutation(api.deployments.updateStatus, {
+			await updateDeploymentStatus({
 				id: deployment._id,
 				status: "pulling",
 			});
 
-			const { containerId } = await deployerClient.run(
-				{
-					name: deployment._id,
-					image: deployment.image,
-					env: deployment.env,
-					ports: deployment.ports,
-				},
-				clients.rpc.opts({ idempotencyKey: deployment._id }),
-			);
+			try {
+				const { containerId } = await deployerClient.run(
+					{
+						name: deployment._id,
+						image: deployment.image,
+						env: deployment.env,
+						ports: deployment.ports,
+					},
+					clients.rpc.opts({ idempotencyKey: deployment._id }),
+				);
 
-			await convex.mutation(api.deployments.updateStatus, {
-				id: deployment._id,
-				status: "running",
-				containerId,
-			});
+				await tryReportDeploymentStatus({
+					id: deployment._id,
+					status: "running",
+					containerId,
+				});
+			} catch (error) {
+				await tryReportDeploymentStatus({
+					id: deployment._id,
+					status: "failed",
+					message: errorMessage(error),
+				});
+			}
 		} else {
-			await deployerClient.stop(
-				{ name: deployment._id },
-				clients.rpc.opts({ idempotencyKey: `${deployment._id}:stop` }),
-			);
+			try {
+				await deployerClient.stop(
+					{ name: deployment._id },
+					clients.rpc.opts({ idempotencyKey: `${deployment._id}:stop` }),
+				);
 
-			await convex.mutation(api.deployments.updateStatus, {
-				id: deployment._id,
-				status: "stopped",
-			});
+				await tryReportDeploymentStatus({
+					id: deployment._id,
+					status: "stopped",
+				});
+			} catch (error) {
+				await tryReportDeploymentStatus({
+					id: deployment._id,
+					status: "failed",
+					message: errorMessage(error),
+				});
+			}
 		}
 	} catch (error) {
-		await convex.mutation(api.deployments.updateStatus, {
-			id: deployment._id,
-			status: "failed",
-			message: error instanceof Error ? error.message : String(error),
-		});
+		console.warn(
+			`[worker] could not reconcile deployment ${deployment._id}`,
+			error,
+		);
 	} finally {
 		inflight.delete(deployment._id);
 	}
+}
+
+function updateDeploymentStatus(update: DeploymentStatusUpdate) {
+	return convex.mutation(api.deployments.updateStatus, update);
+}
+
+async function tryReportDeploymentStatus(update: DeploymentStatusUpdate) {
+	try {
+		await updateDeploymentStatus(update);
+	} catch (error) {
+		console.warn(
+			`[worker] could not report deployment ${update.id} as ${update.status}`,
+			error,
+		);
+	}
+}
+
+function errorMessage(error: unknown) {
+	return error instanceof Error ? error.message : String(error);
 }
 
 // Register our service endpoint with the local Restate server (retrying while it
@@ -131,17 +172,17 @@ async function registerWithRestate(attempt = 0): Promise<void> {
 		});
 
 		if (!response.ok) {
-			throw new Error(`admin responded ${response.status}`);
+			throw new Error(
+				`admin responded ${response.status}: ${await response.text()}`,
+			);
 		}
 
 		console.log(`[restate] registered deployment ${serviceUrl}`);
 	} catch (error) {
 		if (attempt >= 15) {
-			console.warn(
-				"[restate] could not register deployment; is the server up?",
-				error,
+			throw new Error(
+				`[restate] could not register deployment after ${attempt + 1} attempts: ${errorMessage(error)}`,
 			);
-			return;
 		}
 
 		await new Promise((resolve) => setTimeout(resolve, 1000));
