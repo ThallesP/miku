@@ -15,17 +15,17 @@ export type DeploymentStatus =
 export function deploymentStatus(
 	deployment: Doc<"deployments">,
 ): DeploymentStatus {
-	if (deployment.failedAt !== undefined) {
-		return "failed";
+	// terminal stamps win, then latest lifecycle stamp; no stamps → pending
+	switch (true) {
+		case deployment.failedAt !== undefined:
+			return "failed";
+		case deployment.stoppedAt !== undefined:
+			return "stopped";
+		case deployment.runningAt !== undefined:
+			return "running";
+		case deployment.pullingAt !== undefined:
+			return "pulling";
+		default:
+			return "pending";
 	}
-	if (deployment.stoppedAt !== undefined) {
-		return "stopped";
-	}
-	if (deployment.runningAt !== undefined) {
-		return "running";
-	}
-	if (deployment.pullingAt !== undefined) {
-		return "pulling";
-	}
-	return "pending";
 }
