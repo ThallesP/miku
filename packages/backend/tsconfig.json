@@ -1,0 +1,15 @@
+{
+	"include": ["index.ts", "convex/**/*.ts"],
+	"compilerOptions": {
+		"target": "ESNext",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"lib": ["ESNext", "DOM"],
+		"strict": true,
+		"skipLibCheck": true,
+		"noEmit": true,
+		"verbatimModuleSyntax": true,
+		"allowImportingTsExtensions": true,
+		"isolatedModules": true
+	}
+}

@@ -7,8 +7,11 @@
 		"packages/*"
 	],
 	"scripts": {
-		"dev": "turbo dev",
+		"dev": "docker compose up -d --wait && turbo dev",
 		"docker:up": "docker compose up -d --wait",
+		"docker:down": "docker compose down",
+		"convex:admin-key": "docker compose exec convex-backend ./generate_admin_key.sh",
+		"codegen": "turbo run codegen --filter=@miku/backend",
 		"build": "turbo build",
 		"check": "biome check . && turbo check",
 		"lint": "turbo lint",

@@ -1,21 +1,10 @@
 import tailwindcss from "@tailwindcss/vite";
-import { devtools } from "@tanstack/devtools-vite";
-
-import { tanstackStart } from "@tanstack/react-start/plugin/vite";
-
-import viteReact from "@vitejs/plugin-react";
-import { nitro } from "nitro/vite";
+import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import tsconfigPaths from "vite-tsconfig-paths";
 
-const config = defineConfig({
-	resolve: { tsconfigPaths: true },
-	plugins: [
-		devtools(),
-		nitro({ rollupConfig: { external: [/^@sentry\//] } }),
-		tailwindcss(),
-		tanstackStart(),
-		viteReact(),
-	],
+// Plain client-only SPA. No SSR, no Nitro, no file-route codegen — Convex's
+// reactive client does the data layer, React Router does the routing.
+export default defineConfig({
+	plugins: [tsconfigPaths(), react(), tailwindcss()],
 });
-
-export default config;

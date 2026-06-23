@@ -4,18 +4,18 @@
 		"//#docker:up": {
 			"cache": false
 		},
-		"@miku/db#migrate": {
+		"codegen": {
 			"cache": false,
-			"dependsOn": ["//#docker:up"]
+			"outputs": ["convex/_generated/**"]
 		},
 		"dev": {
 			"cache": false,
 			"persistent": true,
-			"dependsOn": ["^build", "@miku/db#migrate"]
+			"dependsOn": ["^build"]
 		},
 		"build": {
 			"dependsOn": ["^build"],
-			"outputs": [".output/**", "dist/**"]
+			"outputs": ["dist/**"]
 		},
 		"check": {
 			"dependsOn": ["^build"]

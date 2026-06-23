@@ -1,23 +1,53 @@
-# Local Postgres for development. Matches the default DATABASE_URL
-# (postgres://postgres:postgres@localhost:5432/miku) used by the API.
-# Start with: docker compose up -d
+# Local dev infra. Convex replaces Postgres as the control-plane datastore; Restate
+# is the workers' durable execution server.
+#   Start with: docker compose up -d --wait
+#   Admin key:  bun run convex:admin-key   (paste into packages/backend/.env.local)
 services:
-  postgres:
-    image: postgres:17-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: miku
+  # Self-hosted Convex: reactive DB + functions. 3210 = API/websocket, 3211 = HTTP actions.
+  convex-backend:
+    image: ghcr.io/get-convex/convex-backend:latest
+    stop_grace_period: 10s
+    stop_signal: SIGINT
     ports:
-      - "5432:5432"
+      - "3210:3210"
+      - "3211:3211"
     volumes:
-      - miku-pg-data:/var/lib/postgresql/data
+      - convex-data:/convex/data
+    environment:
+      CONVEX_CLOUD_ORIGIN: http://127.0.0.1:3210
+      CONVEX_SITE_ORIGIN: http://127.0.0.1:3211
+      DISABLE_BEACON: "true"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d miku"]
+      test: ["CMD", "curl", "-f", "http://localhost:3210/version"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 10s
+
+  # Optional UI for inspecting tables/functions (self-hosted; Convex Cloud's
+  # `npx convex dashboard` is not available for self-hosted deployments).
+  convex-dashboard:
+    image: ghcr.io/get-convex/convex-dashboard:latest
+    ports:
+      - "6791:6791"
+    environment:
+      NEXT_PUBLIC_DEPLOYMENT_URL: http://127.0.0.1:3210
+    depends_on:
+      convex-backend:
+        condition: service_healthy
+
+  # Restate server. 8080 = ingress (invoke handlers), 9070 = admin (register
+  # deployments). host.docker.internal lets it reach a worker's service on the host.
+  restate:
+    image: docker.restate.dev/restatedev/restate:latest
+    ports:
+      - "8080:8080"
+      - "9070:9070"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - restate-data:/restate-data
 
 volumes:
-  miku-pg-data:
+  convex-data:
+  restate-data:

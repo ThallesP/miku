@@ -1,89 +1,150 @@
-import { createServer } from "node:http";
 import os from "node:os";
 
+import { api, type Doc } from "@miku/backend";
 import { joinNetwork } from "@miku/network";
 import * as restate from "@restatedev/restate-sdk";
+import * as clients from "@restatedev/restate-sdk-clients";
+import { ConvexClient } from "convex/browser";
 
-import {
-	readStoredToken,
-	startHeartbeat,
-	storeToken,
-} from "./control-plane.ts";
+import { deployer } from "./deployer.ts";
 
 const workerName = process.env.WORKER_NAME ?? os.hostname();
 const restatePort = Number(process.env.RESTATE_PORT ?? 9080);
-const controlPort = Number(process.env.WORKER_CONTROL_PORT ?? 9091);
+const restateIngress =
+	process.env.RESTATE_INGRESS_URL ?? "http://localhost:8080";
+const restateAdmin = process.env.RESTATE_ADMIN_URL ?? "http://localhost:9070";
+// how the Restate server (running in Docker) reaches this worker's service, which
+// listens on the host — host.docker.internal bridges container → host
+const serviceUrl =
+	process.env.RESTATE_SERVICE_URL ??
+	`http://host.docker.internal:${restatePort}`;
+const convexUrl = process.env.CONVEX_URL ?? "http://localhost:3210";
 
-const worker = restate.service({
-	name: "worker",
-	handlers: {
-		ping: async (_ctx: restate.Context) => ({
-			worker: workerName,
-			ok: true,
-		}),
-	},
+// 1. Join the tailnet. Tailscale stays purely worker-side; nothing reaches back in.
+const identity = await joinNetwork(workerName, {
+	advertiseTags: ["tag:miku-worker"],
 });
 
-let heartbeat: ReturnType<typeof startHeartbeat> | null = null;
+// 2. Serve our local, durable deploy workflow and tell the Restate server about it.
+restate.serve({ services: [deployer], port: restatePort });
+console.log(`[restate] deployer serving on :${restatePort}`);
+await registerWithRestate();
 
-function beginHeartbeat(token: string) {
-	if (heartbeat) {
+// 3. Find the control plane and self-register. Public mutation, no auth in v1 —
+//    this single call replaces the old discover → approve → push-provision flow.
+const convex = new ConvexClient(convexUrl);
+const workerId = await convex.mutation(api.workers.register, {
+	name: identity.name,
+	address: identity.address,
+	network: identity.network,
+});
+console.log(`[worker] registered with control plane as ${workerId}`);
+
+// 4. Heartbeat liveness.
+setInterval(() => {
+	void convex.mutation(api.workers.heartbeat, { workerId }).catch(() => {});
+}, 5000);
+
+// 5. Pull trigger: subscribe to the deployments assigned to us and reconcile each
+//    by driving our OWN local Restate ingress (localhost) — zero reach-in.
+const restateClient = clients.connect({ url: restateIngress });
+// typed from the service definition value — gives us .run()/.stop()
+const deployerClient = restateClient.serviceClient(deployer);
+const inflight = new Set<string>();
+
+convex.onUpdate(api.deployments.forWorker, { workerId }, (deployments) => {
+	for (const deployment of deployments) {
+		void reconcile(deployment);
+	}
+});
+
+async function reconcile(deployment: Doc<"deployments">): Promise<void> {
+	if (inflight.has(deployment._id)) {
 		return;
 	}
 
-	heartbeat = startHeartbeat(token);
-	console.log("[worker] heartbeating with control plane");
+	// re-pick "pulling" too so a deploy interrupted by a crash resumes (the Restate
+	// idempotency key makes the re-invocation collapse onto the same execution)
+	const wantsRun =
+		deployment.desiredState === "running" &&
+		(deployment.status === "pending" || deployment.status === "pulling");
+	const wantsStop =
+		deployment.desiredState === "stopped" && deployment.status !== "stopped";
+
+	if (!wantsRun && !wantsStop) {
+		return;
+	}
+
+	inflight.add(deployment._id);
+	try {
+		if (wantsRun) {
+			await convex.mutation(api.deployments.updateStatus, {
+				id: deployment._id,
+				status: "pulling",
+			});
+
+			const { containerId } = await deployerClient.run(
+				{
+					name: deployment._id,
+					image: deployment.image,
+					env: deployment.env,
+					ports: deployment.ports,
+				},
+				clients.rpc.opts({ idempotencyKey: deployment._id }),
+			);
+
+			await convex.mutation(api.deployments.updateStatus, {
+				id: deployment._id,
+				status: "running",
+				containerId,
+			});
+		} else {
+			await deployerClient.stop(
+				{ name: deployment._id },
+				clients.rpc.opts({ idempotencyKey: `${deployment._id}:stop` }),
+			);
+
+			await convex.mutation(api.deployments.updateStatus, {
+				id: deployment._id,
+				status: "stopped",
+			});
+		}
+	} catch (error) {
+		await convex.mutation(api.deployments.updateStatus, {
+			id: deployment._id,
+			status: "failed",
+			message: error instanceof Error ? error.message : String(error),
+		});
+	} finally {
+		inflight.delete(deployment._id);
+	}
 }
 
-// join the tailnet, advertising the worker tag so the control plane's
-// `tailscale status` discovery can find us
-await joinNetwork(workerName, { advertiseTags: ["tag:miku-worker"] });
+// Register our service endpoint with the local Restate server (retrying while it
+// boots) so the ingress can route invocations to our handlers.
+async function registerWithRestate(attempt = 0): Promise<void> {
+	try {
+		const response = await fetch(`${restateAdmin}/deployments`, {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ uri: serviceUrl, force: true }),
+		});
 
-// the control plane POSTs our api key here once an operator approves us;
-// single-use — ignored once we already hold a token
-const provisionServer = createServer((request, response) => {
-	if (request.method !== "POST" || request.url !== "/provision") {
-		response.writeHead(404).end("not found");
-		return;
-	}
+		if (!response.ok) {
+			throw new Error(`admin responded ${response.status}`);
+		}
 
-	let body = "";
-	request.on("data", (chunk) => {
-		body += chunk;
-	});
-	request.on("end", async () => {
-		if (await readStoredToken()) {
-			response.writeHead(204).end();
+		console.log(`[restate] registered deployment ${serviceUrl}`);
+	} catch (error) {
+		if (attempt >= 15) {
+			console.warn(
+				"[restate] could not register deployment; is the server up?",
+				error,
+			);
 			return;
 		}
 
-		try {
-			const { token } = JSON.parse(body) as { token?: string };
-
-			if (!token) {
-				response.writeHead(400).end("missing token");
-				return;
-			}
-
-			await storeToken(token);
-			beginHeartbeat(token);
-			console.log("[worker] provisioned by control plane");
-			response.writeHead(204).end();
-		} catch {
-			response.writeHead(400).end("bad request");
-		}
-	});
-});
-
-provisionServer.listen(controlPort, () => {
-	console.log(`[worker] provision endpoint on :${controlPort}`);
-});
-
-// resume immediately if we were provisioned on a previous run
-const existingToken = await readStoredToken();
-if (existingToken) {
-	beginHeartbeat(existingToken);
+		await new Promise((resolve) => setTimeout(resolve, 1000));
+		return registerWithRestate(attempt + 1);
+	}
 }
-
-await restate.serve({ services: [worker], port: restatePort });
-console.log(`[restate] worker "${workerName}" serving on :${restatePort}`);

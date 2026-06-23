@@ -1,23 +1,21 @@
 {
-	"name": "workers",
+	"name": "@miku/backend",
 	"private": true,
 	"type": "module",
+	"exports": {
+		".": "./index.ts"
+	},
 	"scripts": {
-		"dev": "bun --watch src/index.ts",
-		"start": "bun src/index.ts",
+		"dev": "convex dev",
+		"codegen": "convex codegen",
 		"check": "tsc --noEmit",
 		"lint": "biome lint --config-path ../../biome.json .",
 		"format": "biome format --config-path ../../biome.json ."
 	},
 	"dependencies": {
-		"@miku/backend": "workspace:*",
-		"@miku/network": "workspace:*",
-		"@restatedev/restate-sdk": "^1.15.0",
-		"@restatedev/restate-sdk-clients": "^1.15.0",
 		"convex": "^1.40.0"
 	},
 	"devDependencies": {
-		"@types/node": "^22.10.2",
 		"typescript": "^6.0.2"
 	}
 }
