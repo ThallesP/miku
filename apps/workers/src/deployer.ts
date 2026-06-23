@@ -3,8 +3,12 @@ import { spawn } from "node:child_process";
 import * as restate from "@restatedev/restate-sdk";
 
 // The durable hands. Each `ctx.run` step is journaled by Restate: on a crash mid
-// deploy it resumes from the last completed step instead of starting over, and a
-// re-invocation with the same idempotency key collapses to one execution.
+// deploy it resumes from the last completed step, and a re-invocation with the
+// same idempotency key collapses to one execution. Steps are bounded so a real,
+// persistent failure (bad image, port already allocated) surfaces as a thrown
+// error — which the worker reports as `failed` — rather than retrying forever.
+
+const RETRY: restate.RunOptions<string> = { maxRetryAttempts: 5 };
 
 type DeployInput = {
 	// container name — we use the Convex deployment id so re-deploys are idempotent
@@ -36,35 +40,6 @@ function docker(args: string[]): Promise<string> {
 	});
 }
 
-async function runContainer(
-	input: DeployInput,
-	portArgs: string[],
-	envArgs: string[],
-) {
-	try {
-		return await docker([
-			"run",
-			"-d",
-			"--name",
-			input.name,
-			...portArgs,
-			...envArgs,
-			input.image,
-		]);
-	} catch (error) {
-		if (!isNameConflict(error)) {
-			throw error;
-		}
-
-		return docker(["inspect", "--format", "{{.Id}}", input.name]);
-	}
-}
-
-function isNameConflict(error: unknown) {
-	const message = error instanceof Error ? error.message.toLowerCase() : "";
-	return message.includes("conflict") && message.includes("already in use");
-}
-
 export const deployer = restate.service({
 	name: "deployer",
 	handlers: {
@@ -72,14 +47,7 @@ export const deployer = restate.service({
 			ctx: restate.Context,
 			input: DeployInput,
 		): Promise<{ containerId: string }> => {
-			await ctx.run("docker pull", () => docker(["pull", input.image]));
-
-			// Drop any previous container before a fresh run; runContainer also
-			// handles a replay after Docker created the container but before Restate
-			// journaled the step result.
-			await ctx.run("docker rm", () =>
-				docker(["rm", "-f", input.name]).catch(() => ""),
-			);
+			await ctx.run("docker pull", () => docker(["pull", input.image]), RETRY);
 
 			const portArgs = (input.ports ?? []).flatMap((p) => ["-p", p]);
 			const envArgs = Object.entries(input.env ?? {}).flatMap(([k, val]) => [
@@ -87,8 +55,26 @@ export const deployer = restate.service({
 				`${k}=${val}`,
 			]);
 
-			const containerId = await ctx.run("docker run", () =>
-				runContainer(input, portArgs, envArgs),
+			// rm + run in ONE durable step so every retry/replay starts clean: a
+			// leftover container from a half-journaled or failed attempt is removed
+			// first, so the returned id always belongs to a container that actually
+			// started. If `docker run` keeps failing, the step exhausts its retries
+			// and throws — no false "running".
+			const containerId = await ctx.run(
+				"docker run",
+				async () => {
+					await docker(["rm", "-f", input.name]).catch(() => "");
+					return docker([
+						"run",
+						"-d",
+						"--name",
+						input.name,
+						...portArgs,
+						...envArgs,
+						input.image,
+					]);
+				},
+				RETRY,
 			);
 
 			return { containerId };
