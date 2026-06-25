@@ -10,7 +10,7 @@ import {
 } from "./docker.ts";
 import { attempt } from "./durable.ts";
 
-// No `desiredState` field: the desire is encoded in WHICH handler the control plane calls.
+// No `desiredStatus` field: the desire is encoded in WHICH handler the control plane calls.
 export type RunSpec = {
 	image: string;
 	env?: Record<string, string>;
@@ -96,10 +96,10 @@ export const deploymentObject = restate.object({
 	},
 });
 
-// desiredState → the handler that drives it, so the control plane just indexes by state and
-// forwards the row. A new desired state is a new entry here, never a reconcile arg on the object.
+// desiredStatus → the handler that drives it, so the control plane just indexes by status and
+// forwards the row. A new desired status is a new entry here, never a reconcile arg on the object.
 export const applyDeployment: Record<
-	Doc<"deployments">["desiredState"],
+	Doc<"deployments">["desiredStatus"],
 	(
 		ingress: clients.Ingress,
 		deployment: Doc<"deployments">,

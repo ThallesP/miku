@@ -44,7 +44,7 @@ export const create = mutation({
 		// born "pending" — the server agent advances the status as it acts
 		return ctx.db.insert("deployments", {
 			...args,
-			desiredState: "running",
+			desiredStatus: "running",
 			status: "pending",
 		});
 	},

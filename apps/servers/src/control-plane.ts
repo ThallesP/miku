@@ -24,13 +24,13 @@ export async function startControlPlane(
 	startHeartbeat(ingress, serverId);
 
 	// Convex is a durable change feed: for every row, call the deployment object handler
-	// that matches its desired state and let the object do the actual work. Redundant
+	// that matches its desired status and let the object do the actual work. Redundant
 	// calls (Convex re-sends the whole array on any change, and our own status writes
 	// re-fire this subscription) are free — the per-key single writer runs them after
 	// the in-flight handler commits a terminal state, so the duplicate just no-ops.
 	convex.onUpdate(api.deployments.forServer, { serverId }, (deployments) => {
 		for (const deployment of deployments) {
-			applyDeployment[deployment.desiredState](ingress, deployment).catch(
+			applyDeployment[deployment.desiredStatus](ingress, deployment).catch(
 				(error) => console.warn("[server] could not enqueue deployment", error),
 			);
 		}

@@ -34,7 +34,7 @@ export default defineSchema({
 		image: v.string(),
 		env: v.optional(v.record(v.string(), v.string())),
 		ports: v.optional(v.array(v.string())),
-		desiredState: v.union(v.literal("running"), v.literal("stopped")),
+		desiredStatus: v.union(v.literal("running"), v.literal("stopped")),
 		// Observed lifecycle status, written directly by the server agent as it
 		// drives the container (pending → pulling → running | failed | stopped).
 		// The row's _creationTime is the "created" stamp.
