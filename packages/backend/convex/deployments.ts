@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 
 import { mutation, query } from "./_generated/server";
+import { imageForSource } from "./lib/apps";
 
 // For the dashboard: every deployment across every server, live.
 export const list = query({
@@ -18,19 +19,19 @@ export const forServer = query({
 			.collect(),
 });
 
-// Deploy = write a row. `serverId` is the explicit placement (you pick the box).
+// Deploy = write a row. You supply only the placement (which app, which box); the
+// image and env are snapshotted from the app so the deployment is a frozen record
+// of what was placed. Ports aren't passed — the server agent derives them from the
+// image's exposed ports.
 export const create = mutation({
 	args: {
 		appId: v.id("apps"),
 		serverId: v.id("servers"),
-		image: v.string(),
-		env: v.optional(v.record(v.string(), v.string())),
-		ports: v.optional(v.array(v.string())),
 	},
-	handler: async (ctx, args) => {
+	handler: async (ctx, { appId, serverId }) => {
 		const [app, server] = await Promise.all([
-			ctx.db.get(args.appId),
-			ctx.db.get(args.serverId),
+			ctx.db.get(appId),
+			ctx.db.get(serverId),
 		]);
 
 		if (!app) {
@@ -43,10 +44,34 @@ export const create = mutation({
 
 		// born "pending" — the server agent advances the status as it acts
 		return ctx.db.insert("deployments", {
-			...args,
+			appId,
+			serverId,
+			image: imageForSource(app.source),
+			env: app.env,
 			desiredStatus: "running",
 			status: "pending",
 		});
+	},
+});
+
+// Stop intent: flip desired state so the control plane routes the row to the
+// server's ensureStopped handler. The observed `status` follows once the agent
+// has torn the container down (markStopped).
+export const stop = mutation({
+	args: { id: v.id("deployments") },
+	handler: (ctx, { id }) => ctx.db.patch(id, { desiredStatus: "stopped" }),
+});
+
+// The final step of removal, called by the server agent once it has torn the
+// container down (ensureRemoved). Tolerant of an already-deleted row so the
+// control plane's redundant calls stay free. Deleting the row here — rather than
+// in apps.remove — is what guarantees a running container is reaped first.
+export const remove = mutation({
+	args: { id: v.id("deployments") },
+	handler: async (ctx, { id }) => {
+		if (await ctx.db.get(id)) {
+			await ctx.db.delete(id);
+		}
 	},
 });
 

@@ -7,3 +7,6 @@ export type { Doc, Id } from "./convex/_generated/dataModel";
 // The deployment status enum lives here too, so the backend and the web share one
 // vocabulary — the Convex analogue of a shared entity enum.
 export type { DeploymentStatus } from "./convex/lib/deployments.ts";
+// The service source shape (Docker image, …) is shared the same way, so the
+// create-application modal and the deploy path agree on what a source is.
+export type { AppSource } from "./convex/lib/apps.ts";

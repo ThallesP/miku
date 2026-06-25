@@ -5,21 +5,22 @@ import type * as clients from "@restatedev/restate-sdk-clients";
 import { api, convex } from "./convex.ts";
 import {
 	ContainerStartError,
+	ImagePullError,
 	removeContainer,
 	runContainer,
 } from "./docker.ts";
 import { attempt } from "./durable.ts";
 
 // No `desiredStatus` field: the desire is encoded in WHICH handler the control plane calls.
+// No `ports` either — the agent reads the image's exposed ports and publishes them itself.
 export type RunSpec = {
 	image: string;
 	env?: Record<string, string>;
-	ports?: string[];
 };
 
 // Durable, crash-surviving outcome. Terminal states make the control plane's redundant calls
 // free — the handler no-ops instead of re-running. Unset means we've never acted.
-type State = "running" | "failed" | "stopped";
+type State = "running" | "failed" | "stopped" | "removed";
 
 // Bound retries so a transient docker/registry blip surfaces as `failed` instead of looping.
 const RETRY: restate.RunOptions<string> = { maxRetryAttempts: 5 };
@@ -86,11 +87,30 @@ export const deploymentObject = restate.object({
 				convex.mutation(api.deployments.markStopped, { id }),
 			);
 		},
+
+		// Service deleted: tear the container down, then delete the row itself.
+		// Unlike ensureStopped this writes no status back — the row is going away —
+		// so the final step is a delete. Reaping the container before the row
+		// vanishes is the whole point: no orphaned containers on the host.
+		ensureRemoved: async (ctx: restate.ObjectContext): Promise<void> => {
+			if ((await ctx.get<State>("state")) === "removed") {
+				return;
+			}
+			const id = ctx.key as Id<"deployments">;
+
+			await ctx.run("docker remove", () => removeContainer(id));
+			ctx.clear("containerId");
+			ctx.set<State>("state", "removed");
+			await ctx.run("delete row", () =>
+				convex.mutation(api.deployments.remove, { id }),
+			);
+		},
 	},
 	options: {
-		// A refused start is terminal; everything else stays retryable.
+		// A refused start or an unpullable image is terminal; everything else
+		// (transient registry/network blips) stays retryable.
 		asTerminalError: (error) =>
-			error instanceof ContainerStartError
+			error instanceof ContainerStartError || error instanceof ImagePullError
 				? new restate.TerminalError(error.message)
 				: undefined,
 	},
@@ -108,7 +128,9 @@ export const applyDeployment: Record<
 	running: (ingress, d) =>
 		ingress
 			.objectSendClient(deploymentObject, d._id)
-			.ensureRunning({ image: d.image, env: d.env, ports: d.ports }),
+			.ensureRunning({ image: d.image, env: d.env }),
 	stopped: (ingress, d) =>
 		ingress.objectSendClient(deploymentObject, d._id).ensureStopped(),
+	removed: (ingress, d) =>
+		ingress.objectSendClient(deploymentObject, d._id).ensureRemoved(),
 };
