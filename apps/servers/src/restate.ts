@@ -3,15 +3,15 @@ import * as clients from "@restatedev/restate-sdk-clients";
 
 import { deploymentObject } from "./deployment.ts";
 import { env } from "./env.ts";
-import { serverObject } from "./server.ts";
+import { heartbeatObject } from "./heartbeat.ts";
 
-// Serve our durable objects on localhost and register them with the local Restate
-// server (retrying while it boots) so its ingress can route invocations back to the
-// handlers we host. The objects run in THIS process, next to the docker and Convex
-// clients — Restate only routes; it never reaches into the tailnet.
+// Serve our Virtual Objects on localhost and register them with the local Restate server
+// (retrying while it boots) so its ingress can route invocations back to the handlers we
+// host. The objects run in THIS process, next to the docker and Convex clients — Restate
+// only routes; it never reaches into the tailnet.
 export async function serveRestate(): Promise<void> {
 	restate.serve({
-		services: [deploymentObject, serverObject],
+		services: [deploymentObject, heartbeatObject],
 		port: env.RESTATE_PORT,
 	});
 	console.log(`[restate] serving on :${env.RESTATE_PORT}`);

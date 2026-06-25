@@ -1,33 +1,15 @@
-import type { Doc } from "../_generated/dataModel";
+import { type Infer, v } from "convex/values";
 
-// Convex documents are plain data — no methods, so no entity getter. The clean
-// equivalent is a pure derive function shared by everyone: the backend stamps it
-// onto each row it returns, and the web imports the same function. Status is
-// computed from lifecycle timestamps, which also gives a free timeline
-// (createdAt → pullingAt → runningAt) for durations.
-export type DeploymentStatus =
-	| "pending"
-	| "pulling"
-	| "running"
-	| "failed"
-	| "stopped";
+// Single source of truth for the deployment lifecycle status. Stored directly on
+// the row (the server agent writes it as it drives the container) and shared with
+// the web app so both sides speak the same vocabulary — the Convex analogue of a
+// shared enum. "pending" is the initial value before the server has acted.
+export const deploymentStatusValidator = v.union(
+	v.literal("pending"),
+	v.literal("pulling"),
+	v.literal("running"),
+	v.literal("failed"),
+	v.literal("stopped"),
+);
 
-export function deploymentStatus(
-	deployment: Doc<"deployments">,
-): DeploymentStatus {
-	// timestamps are only ever Date.now() or unset, so a truthy check is enough;
-	// terminal stamps win, then the latest lifecycle stamp; no stamps → pending
-	if (deployment.failedAt) {
-		return "failed";
-	}
-	if (deployment.stoppedAt) {
-		return "stopped";
-	}
-	if (deployment.runningAt) {
-		return "running";
-	}
-	if (deployment.pullingAt) {
-		return "pulling";
-	}
-	return "pending";
-}
+export type DeploymentStatus = Infer<typeof deploymentStatusValidator>;

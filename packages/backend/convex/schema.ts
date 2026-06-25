@@ -1,6 +1,8 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
+import { deploymentStatusValidator } from "./lib/deployments";
+
 // Single source of truth for the whole control plane. This replaces the MikroORM
 // entities (Application/Server/Position) and every nestia DTO — the generated
 // types flow straight to the web app and the servers.
@@ -33,14 +35,10 @@ export default defineSchema({
 		env: v.optional(v.record(v.string(), v.string())),
 		ports: v.optional(v.array(v.string())),
 		desiredState: v.union(v.literal("running"), v.literal("stopped")),
-		// Lifecycle timestamps — `status` is *derived* from which of these are set
-		// (see lib/deployments.ts), the Convex stand-in for a computed getter. The
-		// row's _creationTime is the "created" stamp; runningAt - _creationTime is
-		// the deploy duration.
-		pullingAt: v.optional(v.number()),
-		runningAt: v.optional(v.number()),
-		failedAt: v.optional(v.number()),
-		stoppedAt: v.optional(v.number()),
+		// Observed lifecycle status, written directly by the server agent as it
+		// drives the container (pending → pulling → running | failed | stopped).
+		// The row's _creationTime is the "created" stamp.
+		status: deploymentStatusValidator,
 		containerId: v.optional(v.string()),
 		message: v.optional(v.string()),
 	})

@@ -26,8 +26,8 @@ import {
 
 const ONLINE_THRESHOLD_MS = 15_000;
 
-// the deployments queries return each row with its derived status stamped on
-type Deployment = Doc<"deployments"> & { status: DeploymentStatus };
+// deployment rows carry their lifecycle status as a stored field
+type Deployment = Doc<"deployments">;
 
 type AppNodeData = {
 	id: Id<"apps">;
@@ -35,7 +35,6 @@ type AppNodeData = {
 	x: number;
 	y: number;
 	status?: DeploymentStatus;
-	durationMs?: number;
 } & Record<string, unknown>;
 
 type ServerNodeData = {
@@ -87,10 +86,6 @@ function buildNodes(
 					x: app.x,
 					y: app.y,
 					status: latest?.status,
-					durationMs:
-						latest?.runningAt !== undefined
-							? latest.runningAt - latest._creationTime
-							: undefined,
 				},
 			};
 		}),
@@ -123,8 +118,7 @@ export function Dashboard() {
 	const draggingRef = useRef(false);
 	const lastMoveRef = useRef(0);
 
-	// latest deployment status per app, for the badge on each application node
-	// latest deployment per app (by creation time) → status + duration badge
+	// latest deployment per app (by creation time) → status badge on its node
 	const latestByApp = useMemo(() => {
 		const latest = new Map<string, Deployment>();
 		for (const deployment of deployments) {
@@ -343,11 +337,6 @@ function ApplicationNode({
 					className={`mt-2 inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-medium text-xs ${STATUS_STYLES[data.status]}`}
 				>
 					{data.status}
-					{data.durationMs !== undefined ? (
-						<span className="opacity-70">
-							· {(data.durationMs / 1000).toFixed(1)}s
-						</span>
-					) : null}
 				</span>
 			) : null}
 		</div>

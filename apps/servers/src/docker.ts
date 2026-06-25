@@ -1,7 +1,11 @@
 import { DockerClient } from "@docker/node-sdk";
-import * as restate from "@restatedev/restate-sdk";
 
 import { env } from "./env.ts";
+
+// The daemon accepted the create/start but the container is not actually running (bad
+// entrypoint, host port already taken). Deterministic — a retry won't help — so the
+// deployment object maps it straight to a Restate TerminalError (see asTerminalError).
+export class ContainerStartError extends Error {}
 
 export type ContainerSpec = {
 	// container name — the Convex deployment id, so re-deploys are idempotent
@@ -51,10 +55,7 @@ export async function runContainer(spec: ContainerSpec): Promise<string> {
 	const { State } = await docker.containerInspect(Id);
 	if (State?.Status !== "running") {
 		await removeContainer(spec.name);
-		// A container that refuses to start (bad entrypoint, port already taken) won't
-		// start on a retry either — fail fast with a TerminalError so the durable step
-		// surfaces it as `failed` instead of burning every retry attempt.
-		throw new restate.TerminalError(
+		throw new ContainerStartError(
 			State?.Error ||
 				`container did not start (status: ${State?.Status}, exit: ${State?.ExitCode})`,
 		);
